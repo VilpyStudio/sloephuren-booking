@@ -69,10 +69,18 @@ class SHB_Plugin {
 	 * Scripts en styles registreren (worden pas ingeladen bij de shortcode).
 	 */
 	public function register_assets() {
+		// Google Fonts van het designsysteem (Bebas Neue, Hanken Grotesk, Space Grotesk).
+		wp_register_style(
+			'shb-fonts',
+			'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500&display=swap',
+			array(),
+			null
+		);
+
 		wp_register_style(
 			'shb-booking',
 			SHB_PLUGIN_URL . 'public/css/booking.css',
-			array(),
+			array( 'shb-fonts' ),
 			SHB_VERSION
 		);
 
@@ -96,10 +104,20 @@ class SHB_Plugin {
 	 * @return string
 	 */
 	public function render_shortcode( $atts ) {
+		$atts = shortcode_atts(
+			array(
+				'sloep'        => 'geen', // Koppel aan één sloep (naam); slaat stap 1 over.
+				'start_open'   => '0',    // Widget direct geopend tonen.
+				'auto_advance' => '1',    // Automatisch doorgaan na een keuze.
+			),
+			$atts,
+			'sloephuren_booking'
+		);
+
 		wp_enqueue_style( 'shb-booking' );
 		wp_enqueue_script( 'shb-booking' );
 
-		// Gegevens die de frontend nodig heeft.
+		// Pakketten.
 		$products = array();
 		foreach ( SHB_Bookings::get_products( true ) as $p ) {
 			$products[] = array(
@@ -109,8 +127,7 @@ class SHB_Plugin {
 			);
 		}
 
-		// Sloep-types worden als eerste stap getoond, dus zonder datumafhankelijke
-		// beschikbaarheid (die wordt pas gecontroleerd bij de tijdslot-stap).
+		// Sloep-types.
 		$boats = array();
 		foreach ( SHB_Bookings::get_boat_types( true ) as $b ) {
 			$boats[] = array(
@@ -124,111 +141,23 @@ class SHB_Plugin {
 			'shb-booking',
 			'SHB_DATA',
 			array(
-				'rest'     => esc_url_raw( rest_url( self::REST_NS ) ),
-				'nonce'    => wp_create_nonce( 'wp_rest' ),
-				'products' => $products,
-				'boats'    => $boats,
-				'return'   => esc_url_raw( $this->current_url() ),
-				'terms'    => esc_url_raw( get_option( 'shb_terms_url', '' ) ),
-				'currency' => '€',
-				'minDate'  => gmdate( 'Y-m-d', current_time( 'timestamp' ) ), // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
-				'i18n'     => $this->i18n_strings(),
+				'rest'        => esc_url_raw( rest_url( self::REST_NS ) ),
+				'nonce'       => wp_create_nonce( 'wp_rest' ),
+				'products'    => $products,
+				'boats'       => $boats,
+				'return'      => esc_url_raw( $this->current_url() ),
+				'terms'       => esc_url_raw( get_option( 'shb_terms_url', '' ) ),
+				'logo'        => esc_url_raw( SHB_PLUGIN_URL . 'public/img/logo.svg' ),
+				'fixedSloep'  => sanitize_text_field( $atts['sloep'] ),
+				'startOpen'   => ( '1' === (string) $atts['start_open'] || 'true' === $atts['start_open'] ),
+				'autoAdvance' => ! ( '0' === (string) $atts['auto_advance'] || 'false' === $atts['auto_advance'] ),
+				'currency'    => '€',
 			)
 		);
 
-		ob_start();
-		$this->render_form_markup();
-
-		// Retour-melding tonen wanneer de klant terugkeert van de betaling.
-		$this->maybe_render_return_notice();
-
-		return ob_get_clean();
-	}
-
-	/**
-	 * HTML-skelet van het boekformulier. De stappen worden door JS gevuld.
-	 */
-	protected function render_form_markup() {
-		?>
-		<div class="shb-booking" id="shb-booking">
-			<div class="shb-progress" aria-hidden="true">
-				<span class="shb-progress-bar"></span>
-			</div>
-
-			<div class="shb-steps">
-				<!-- Stap 1: sloep-type -->
-				<section class="shb-step" data-step="1">
-					<h3 class="shb-step-title"><?php esc_html_e( '1. Kies je sloep', 'sloephuren-booking' ); ?></h3>
-					<div class="shb-boats" id="shb-boats"></div>
-				</section>
-
-				<!-- Stap 2: pakket -->
-				<section class="shb-step" data-step="2" hidden>
-					<h3 class="shb-step-title"><?php esc_html_e( '2. Kies je pakket', 'sloephuren-booking' ); ?></h3>
-					<div class="shb-packages" id="shb-packages"></div>
-				</section>
-
-				<!-- Stap 3: datum -->
-				<section class="shb-step" data-step="3" hidden>
-					<h3 class="shb-step-title"><?php esc_html_e( '3. Kies een datum', 'sloephuren-booking' ); ?></h3>
-					<div class="shb-datepicker-wrap">
-						<button type="button" class="shb-date-trigger" id="shb-date-trigger" aria-haspopup="dialog" aria-expanded="false">
-							<svg class="shb-date-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-								<path d="M7 2v3M17 2v3M3.5 8.5h17M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-							</svg>
-							<span id="shb-date-trigger-text"><?php esc_html_e( 'Kies een datum', 'sloephuren-booking' ); ?></span>
-						</button>
-						<div class="shb-calendar" id="shb-calendar" hidden></div>
-					</div>
-				</section>
-
-				<!-- Stap 4: tijdslot -->
-				<section class="shb-step" data-step="4" hidden>
-					<h3 class="shb-step-title"><?php esc_html_e( '4. Kies een tijdslot', 'sloephuren-booking' ); ?></h3>
-					<div class="shb-slots" id="shb-slots"></div>
-				</section>
-
-				<!-- Stap 5: gegevens -->
-				<section class="shb-step" data-step="5" hidden>
-					<h3 class="shb-step-title"><?php esc_html_e( '5. Je gegevens', 'sloephuren-booking' ); ?></h3>
-					<div class="shb-fields">
-						<label class="shb-field">
-							<span><?php esc_html_e( 'Naam', 'sloephuren-booking' ); ?></span>
-							<input type="text" class="shb-input" id="shb-name" required>
-						</label>
-						<label class="shb-field">
-							<span><?php esc_html_e( 'E-mailadres', 'sloephuren-booking' ); ?></span>
-							<input type="email" class="shb-input" id="shb-email" required>
-						</label>
-						<label class="shb-field">
-							<span><?php esc_html_e( 'Telefoon', 'sloephuren-booking' ); ?></span>
-							<input type="tel" class="shb-input" id="shb-phone" required>
-						</label>
-						<label class="shb-field">
-							<span><?php esc_html_e( 'Aantal personen', 'sloephuren-booking' ); ?></span>
-							<input type="number" class="shb-input" id="shb-persons" min="1" max="8" value="2" required>
-						</label>
-					</div>
-
-					<label class="shb-terms">
-						<input type="checkbox" id="shb-agree">
-						<span id="shb-terms-label"><?php esc_html_e( 'Ik ga akkoord met de voorwaarden.', 'sloephuren-booking' ); ?></span>
-					</label>
-				</section>
-			</div>
-
-			<!-- Samenvatting + knoppen -->
-			<div class="shb-summary" id="shb-summary" hidden></div>
-
-			<div class="shb-error" id="shb-error" role="alert" hidden></div>
-
-			<div class="shb-actions">
-				<button type="button" class="shb-btn shb-btn-ghost" id="shb-back" hidden><?php esc_html_e( 'Terug', 'sloephuren-booking' ); ?></button>
-				<button type="button" class="shb-btn shb-btn-primary" id="shb-next" disabled><?php esc_html_e( 'Volgende', 'sloephuren-booking' ); ?></button>
-				<button type="button" class="shb-btn shb-btn-primary" id="shb-submit" hidden><?php esc_html_e( 'Boek &amp; betaal direct', 'sloephuren-booking' ); ?></button>
-			</div>
-		</div>
-		<?php
+		// De widget (launcher + paneel) wordt door JS aan <body> gehangen.
+		// Dit anker houdt alleen de config vast en zorgt dat de assets laden.
+		return '<div class="shb-widget-anchor" aria-hidden="true" style="display:none"></div>';
 	}
 
 	/**

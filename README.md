@@ -14,6 +14,14 @@ Installeer via de zip uit de [GitHub Releases](https://github.com/VilpyStudio/sl
    [sloephuren_booking]
    ```
 
+   De widget verschijnt als zwevende launcher rechtsonder op de pagina. Optionele attributen:
+
+   ```
+   [sloephuren_booking sloep="Stout 650"]   koppel aan één sloep (slaat stap 1 over)
+   [sloephuren_booking start_open="1"]        widget direct geopend tonen
+   [sloephuren_booking auto_advance="0"]      niet automatisch doorgaan na een keuze
+   ```
+
 ## Standaarddata
 
 **Sloep-types**
@@ -31,9 +39,9 @@ Installeer via de zip uit de [GitHub Releases](https://github.com/VilpyStudio/sl
 
 ## Boekflow (frontend)
 
-Stapsgewijs formulier: pakket → datum → tijdslot → sloep → gegevens → akkoord → *Boek & betaal direct*.
-- Alleen beschikbare tijdsloten en sloepen worden getoond.
-- Prijzen zonder brandstofkosten in het frontend-prijsblok.
+Zwevende widget (Booqable-achtig): een launcher-pill rechtsonder (full-width onderaan op mobiel) opent een boekingspaneel. Stappen: sloep → pakket → datum (inline kalender) → tijdslot → gegevens & samenvatting → *Boek & betaal*. Na terugkeer van de betaling toont de widget een successcherm met boekingsnummer.
+- Alleen beschikbare tijdsloten worden getoond (echte beschikbaarheid bij de tijdslot-stap).
+- Prijzen zonder brandstofkosten in het prijsblok.
 - Zaanse Sloep = max. 2 boekingen per tijdslot; Luxal Nautic en Stout 650 = max. 1.
 - Niet-betaalde (pending) boekingen blokkeren een plek maximaal 15 minuten.
 
@@ -77,6 +85,7 @@ includes/class-emails.php       Bevestigings- en beheerdersmails
 includes/class-admin.php        Admin-menu en beheerschermen
 includes/class-github-updater.php  Automatische updates vanuit GitHub Releases
 includes/class-plugin.php       Shortcode, assets, REST API, callbacks
-public/js/booking.js            Frontend stepper
-public/css/booking.css          Styling (huisstijl zaans-blauw/marine/zand)
+public/js/booking.js            Zwevende widget (launcher + paneel, stappen, kalender)
+public/css/booking.css          Styling (Sloephuren-designsysteem)
+public/img/logo.svg             Logo voor launcher en paneel-header
 ```

@@ -3,6 +3,18 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.0.0] - 2026-07-01
+
+### Changed
+- **Volledige redesign van de frontend naar een zwevende boekingswidget** (Booqable-achtig) volgens de complete Sloephuren-designhandoff. Gesloten: een vaste launcher-pill rechtsonder (full-width onderaan op mobiel). Open: een zwevend paneel (bottom-sheet op mobiel) met marine header, klikbare voortgangsbalk, scrollbare inhoud en sticky actiebalk met totaalprijs.
+- Nieuw designsysteem met exacte tokens (marine #15324F, crème, accentblauw), Bebas Neue / Hanken Grotesk / Space Grotesk (nu ook door de plugin geladen).
+- Inline kalender in plaats van popup, personen-stepper, samenvatting met "wijzig"-knoppen, auto-doorgaan na een keuze, en een successcherm met boekingsnummer na terugkeer van de betaling.
+- Shortcode-attributen: `sloep="Stout 650"` koppelt de widget aan één sloep (slaat stap 1 over), plus `start_open` en `auto_advance`.
+- De widget wordt aan `<body>` gehangen zodat `position:fixed` betrouwbaar werkt naast thema-transforms.
+
+### Notes
+- Backend (REST-beschikbaarheid, GET_LOCK anti-dubbelboek, mock/Mollie-betaling, mails) ongewijzigd. De kalender is een datumkiezer; echte beschikbaarheid verschijnt bij de tijdslot-stap.
+
 ## [1.0.3] - 2026-07-01
 
 ### Added
