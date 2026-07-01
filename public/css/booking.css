@@ -758,6 +758,70 @@
 .shb-next[disabled] { opacity: .45; cursor: not-allowed; }
 
 /* ═══════════════════════════════════════════════════════════ */
+/* Thema-proofing                                               */
+/* Sommige thema's zetten een achtergrond op button/button:hover.*/
+/* Onze knoppen ZIJN buttons, dus we vergrendelen de eigen       */
+/* kleuren met hoge specificiteit (.shb-scope + :hover) én        */
+/* !important zodat thema-hovers niet doorkomen.                  */
+/* ═══════════════════════════════════════════════════════════ */
+.shb-scope.shb-launcher,
+.shb-scope.shb-launcher:hover,
+.shb-scope.shb-launcher:focus {
+	background: var(--sh-marine-900) !important;
+	color: var(--sh-creme-100) !important;
+	border: none !important;
+}
+.shb-scope.shb-launcher .shb-launcher-label,
+.shb-scope.shb-launcher:hover .shb-launcher-label { color: var(--sh-creme-100) !important; }
+.shb-scope.shb-launcher .shb-launcher-sub,
+.shb-scope.shb-launcher:hover .shb-launcher-sub { color: var(--sh-slate) !important; }
+
+.shb-scope .shb-card,
+.shb-scope .shb-card:hover,
+.shb-scope .shb-card:focus {
+	background: var(--sh-white) !important;
+	border-color: var(--sh-line) !important;
+}
+.shb-scope .shb-card.is-selected,
+.shb-scope .shb-card.is-selected:hover {
+	background: var(--sh-creme-200) !important;
+	border-color: var(--sh-marine-900) !important;
+}
+.shb-scope .shb-card .shb-card-name,
+.shb-scope .shb-card:hover .shb-card-name { color: var(--sh-marine-900) !important; }
+.shb-scope .shb-card .shb-card-sub,
+.shb-scope .shb-card:hover .shb-card-sub,
+.shb-scope .shb-card .shb-card-time,
+.shb-scope .shb-card:hover .shb-card-time { color: var(--sh-ink-600) !important; }
+.shb-scope .shb-card .shb-card-price,
+.shb-scope .shb-card:hover .shb-card-price { color: var(--sh-marine-700) !important; }
+
+.shb-scope .shb-next,
+.shb-scope .shb-next:hover,
+.shb-scope .shb-next:focus {
+	background: var(--sh-marine-900) !important;
+	color: var(--sh-creme-100) !important;
+	border: none !important;
+}
+.shb-scope .shb-close,
+.shb-scope .shb-close:hover { background: rgba(244, 239, 230, .14) !important; color: var(--sh-creme-100) !important; border: none !important; }
+.shb-scope .shb-cal-nav,
+.shb-scope .shb-cal-nav:hover,
+.shb-scope .shb-step-btn,
+.shb-scope .shb-step-btn:hover { background: var(--sh-creme-200) !important; color: var(--sh-marine-900) !important; }
+.shb-scope .shb-back,
+.shb-scope .shb-back:hover,
+.shb-scope .shb-sum-edit,
+.shb-scope .shb-sum-edit:hover,
+.shb-scope .shb-reset,
+.shb-scope .shb-reset:hover { background: transparent !important; }
+.shb-scope .shb-back:hover,
+.shb-scope .shb-sum-edit:hover,
+.shb-scope .shb-reset:hover { color: var(--sh-marine-900) !important; }
+.shb-scope .shb-checkbox { background: #fff !important; }
+.shb-scope .shb-checkbox.is-checked { background: var(--sh-marine-900) !important; }
+
+/* ═══════════════════════════════════════════════════════════ */
 /* Mobiel (<= 640px): full-width launcher + bottom-sheet paneel */
 /* ═══════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
