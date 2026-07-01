@@ -4,6 +4,8 @@ Custom WordPress-plugin voor **sloepverhuurzaanstad.nl**: bezoekers boeken onlin
 
 ## Installatie
 
+Installeer via de zip uit de [GitHub Releases](https://github.com/VilpyStudio/sloephuren-booking/releases), of:
+
 1. Kopieer de map `sloephuren-booking` naar `wp-content/plugins/`.
 2. Activeer de plugin in **Plugins**. Bij activatie worden de databasetabellen aangemaakt en gevuld met standaarddata (3 sloep-types, 2 pakketten, tijdsloten).
 3. Plaats op een pagina de shortcode:
@@ -61,6 +63,7 @@ Na een succesvolle betaling gaat er automatisch een bevestiging naar de klant en
 - Beschikbaarheidschecks via de REST API (`/wp-json/sloephuren/v1/…`).
 - Gelijktijdige boekingen worden veilig afgehandeld met een MySQL named lock (`GET_LOCK`), plus een hercontrole binnen de lock voordat de boeking wordt weggeschreven.
 - WP-Cron (elke 5 min) markeert verlopen pending-boekingen als `expired`.
+- Automatische updates vanuit GitHub Releases: nieuwe versies verschijnen in het normale WordPress update-scherm, met een "Controleer op updates"-link in de pluginregel.
 
 ## Bestandsstructuur
 
@@ -72,6 +75,7 @@ includes/class-availability.php Beschikbaarheid + veilige boeking-aanmaak
 includes/class-payments.php     Mock + Mollie betaalproviders
 includes/class-emails.php       Bevestigings- en beheerdersmails
 includes/class-admin.php        Admin-menu en beheerschermen
+includes/class-github-updater.php  Automatische updates vanuit GitHub Releases
 includes/class-plugin.php       Shortcode, assets, REST API, callbacks
 public/js/booking.js            Frontend stepper
 public/css/booking.css          Styling (huisstijl zaans-blauw/marine/zand)

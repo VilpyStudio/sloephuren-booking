@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Vaste plugin-constanten.
  */
-define( 'SHB_VERSION', '1.0.2' );
+define( 'SHB_VERSION', '1.0.3' );
 define( 'SHB_PLUGIN_FILE', __FILE__ );
 define( 'SHB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -39,6 +39,7 @@ require_once SHB_PLUGIN_DIR . 'includes/class-availability.php';
 require_once SHB_PLUGIN_DIR . 'includes/class-payments.php';
 require_once SHB_PLUGIN_DIR . 'includes/class-emails.php';
 require_once SHB_PLUGIN_DIR . 'includes/class-admin.php';
+require_once SHB_PLUGIN_DIR . 'includes/class-github-updater.php';
 require_once SHB_PLUGIN_DIR . 'includes/class-plugin.php';
 
 /**
@@ -55,6 +56,8 @@ register_deactivation_hook( __FILE__, array( 'SHB_Install', 'deactivate' ) );
  * Plugin starten zodra alle plugins geladen zijn.
  */
 function shb_run() {
+	// Automatische updates vanuit GitHub Releases.
+	new SHB_GitHub_Updater();
 	return SHB_Plugin::instance();
 }
 add_action( 'plugins_loaded', 'shb_run' );

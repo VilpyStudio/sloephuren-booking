@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [1.0.3] - 2026-07-01
+
+### Added
+- Automatische updates vanuit GitHub Releases (publieke repo, geen token). De plugin verschijnt in het normale WordPress update-scherm zodra er een nieuwere release-tag is, met een "Controleer op updates"-link in de pluginregel.
+
 ## [1.0.2] - 2026-07-01
 
 ### Fixed
