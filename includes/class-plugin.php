@@ -45,6 +45,8 @@ class SHB_Plugin {
 		// Frontend.
 		add_shortcode( 'sloephuren_booking', array( $this, 'render_shortcode' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
+		// Widget overal op de site tonen (indien ingeschakeld).
+		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_sitewide' ), 20 );
 
 		// REST API.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
@@ -103,6 +105,13 @@ class SHB_Plugin {
 	 * @param array $atts Attributen.
 	 * @return string
 	 */
+	/**
+	 * Of de widget-assets al zijn ingeladen (voorkomt dubbele output).
+	 *
+	 * @var bool
+	 */
+	protected $enqueued = false;
+
 	public function render_shortcode( $atts ) {
 		$atts = shortcode_atts(
 			array(
@@ -112,6 +121,32 @@ class SHB_Plugin {
 			),
 			$atts,
 			'sloephuren_booking'
+		);
+
+		$this->enqueue_widget( $atts );
+
+		// De widget (launcher + paneel) wordt door JS aan <body> gehangen.
+		return '<div class="shb-widget-anchor" aria-hidden="true" style="display:none"></div>';
+	}
+
+	/**
+	 * Widget-assets + configuratie inladen (gedeeld door shortcode en sitewide).
+	 *
+	 * @param array $atts Widget-attributen.
+	 */
+	public function enqueue_widget( $atts = array() ) {
+		if ( $this->enqueued ) {
+			return; // Slechts één keer per pagina.
+		}
+		$this->enqueued = true;
+
+		$atts = wp_parse_args(
+			$atts,
+			array(
+				'sloep'        => 'geen',
+				'start_open'   => '0',
+				'auto_advance' => '1',
+			)
 		);
 
 		wp_enqueue_style( 'shb-booking' );
@@ -154,10 +189,19 @@ class SHB_Plugin {
 				'currency'    => '€',
 			)
 		);
+	}
 
-		// De widget (launcher + paneel) wordt door JS aan <body> gehangen.
-		// Dit anker houdt alleen de config vast en zorgt dat de assets laden.
-		return '<div class="shb-widget-anchor" aria-hidden="true" style="display:none"></div>';
+	/**
+	 * De widget overal op de site tonen wanneer de instelling aanstaat.
+	 */
+	public function maybe_enqueue_sitewide() {
+		if ( is_admin() ) {
+			return;
+		}
+		if ( ! get_option( 'shb_sitewide', 0 ) ) {
+			return;
+		}
+		$this->enqueue_widget();
 	}
 
 	/**

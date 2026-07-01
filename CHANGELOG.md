@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.1.0] - 2026-07-01
+
+### Added
+- Instelling "Widget overal op de site tonen" (standaard aan): de zwevende widget verschijnt op elke pagina, niet alleen waar de shortcode staat. Uit te zetten onder Sloephuren → Instellingen wanneer je 'm alleen via de shortcode wilt plaatsen.
+
 ## [2.0.0] - 2026-07-01
 
 ### Changed

@@ -243,6 +243,8 @@ class SHB_Admin {
 
 		update_option( 'shb_terms_url', esc_url_raw( wp_unslash( $_POST['terms_url'] ?? '' ) ) );
 
+		update_option( 'shb_sitewide', empty( $_POST['sitewide'] ) ? 0 : 1 );
+
 		$this->redirect( 'shb-settings' );
 	}
 
@@ -653,6 +655,10 @@ class SHB_Admin {
 
 				<label><?php esc_html_e( 'Mollie API-sleutel', 'sloephuren-booking' ); ?></label>
 				<input type="text" name="mollie_api_key" value="<?php echo esc_attr( get_option( 'shb_mollie_api_key', '' ) ); ?>" placeholder="live_... of test_...">
+
+				<h2><?php esc_html_e( 'Weergave', 'sloephuren-booking' ); ?></h2>
+				<label><input type="checkbox" name="sitewide" value="1" <?php checked( get_option( 'shb_sitewide', 0 ), 1 ); ?>> <?php esc_html_e( 'Widget overal op de site tonen', 'sloephuren-booking' ); ?></label>
+				<p class="description"><?php esc_html_e( 'Toont de zwevende boek-widget op elke pagina. Laat dit uit als je de widget alleen via de shortcode op specifieke pagina\'s wilt plaatsen.', 'sloephuren-booking' ); ?></p>
 
 				<h2><?php esc_html_e( 'Boekingen', 'sloephuren-booking' ); ?></h2>
 				<label><?php esc_html_e( 'Pending-blokkade (minuten)', 'sloephuren-booking' ); ?></label>

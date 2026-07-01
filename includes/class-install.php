@@ -45,6 +45,7 @@ class SHB_Install {
 		add_option( 'shb_mollie_api_key', '' );
 		add_option( 'shb_admin_email', get_option( 'admin_email' ) );
 		add_option( 'shb_terms_url', '' );
+		add_option( 'shb_sitewide', 1 ); // Widget standaard overal tonen.
 		add_option( 'shb_db_version', SHB_VERSION );
 
 		// Cron inplannen om verlopen pending-boekingen te markeren.
