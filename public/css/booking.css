@@ -1,0 +1,494 @@
+/**
+ * Sloephuren Booking - frontend styling.
+ *
+ * Huisstijl sloepverhuurzaanstad.nl: zaans-blauw / marine / zand,
+ * koppen in Bebas Neue, tekst in Hanken Grotesk / Space Grotesk.
+ * Kleuren staan als CSS-variabelen zodat ze eenvoudig te overschrijven zijn.
+ *
+ * Belangrijk: de site-theme levert een eigen default `button`-stijl
+ * (kleur/achtergrond) die zwaarder weegt dan gewone class-selectors zodra
+ * hij na dit bestand geladen wordt. Kleur- en randeigenschappen op knoppen
+ * krijgen daarom bewust !important, zodat het boekformulier altijd de
+ * eigen huisstijl toont in plaats van de thema-standaardkleur.
+ */
+
+.shb-booking {
+	--shb-navy: #12324a;      /* zaans-blauw, diep */
+	--shb-marine: #2a6f97;    /* marine accent */
+	--shb-marine-dark: #1f5678;
+	--shb-sand: #f4f1ea;      /* zand / cream */
+	--shb-sand-dark: #e6ddc9;
+	--shb-ink: #23303a;
+	--shb-muted: #7d8a95;
+	--shb-line: #e2dccd;
+	--shb-white: #ffffff;
+	--shb-success: #1f7a4d;
+	--shb-error: #a12b2b;
+	--shb-radius: 14px;
+	--shb-shadow: 0 10px 30px rgba(18, 50, 74, .10);
+
+	max-width: 720px;
+	margin: 0 auto;
+	background: var(--shb-white);
+	border-radius: var(--shb-radius);
+	box-shadow: var(--shb-shadow);
+	padding: 28px;
+	color: var(--shb-ink);
+	font-family: "Hanken Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	box-sizing: border-box;
+}
+
+.shb-booking *,
+.shb-booking *::before,
+.shb-booking *::after {
+	box-sizing: border-box;
+}
+
+/* Reset thema-standaarden op alle knoppen binnen het boekformulier: sommige
+   thema's zetten op <button> standaard white-space:pre, waardoor tekst
+   nooit afbreekt en tegen de rand van de kaart aan loopt. */
+.shb-booking button {
+	white-space: normal !important;
+	font-family: inherit;
+}
+
+.shb-booking button:focus {
+	outline: none;
+}
+.shb-booking button:focus-visible {
+	outline: 2px solid var(--shb-marine) !important;
+	outline-offset: 2px;
+}
+
+/* Voortgangsbalk */
+.shb-progress {
+	height: 6px;
+	background: var(--shb-sand);
+	border-radius: 999px;
+	overflow: hidden;
+	margin-bottom: 24px;
+}
+.shb-progress-bar {
+	display: block;
+	height: 100%;
+	width: 20%;
+	background: linear-gradient(90deg, var(--shb-marine), var(--shb-navy));
+	border-radius: 999px;
+	transition: width .35s ease;
+}
+
+/* Stap-koppen */
+.shb-step-title {
+	font-family: "Bebas Neue", "Hanken Grotesk", sans-serif;
+	letter-spacing: .5px;
+	font-size: 26px;
+	line-height: 1.1;
+	color: var(--shb-navy);
+	margin: 0 0 16px;
+}
+
+/* Inputs */
+.shb-input {
+	width: 100%;
+	padding: 13px 14px;
+	border: 1.5px solid var(--shb-line) !important;
+	border-radius: 10px;
+	font-size: 16px;
+	color: var(--shb-ink) !important;
+	background: var(--shb-white) !important;
+	transition: border-color .2s ease, box-shadow .2s ease;
+	font-family: inherit;
+}
+.shb-input:focus {
+	outline: none;
+	border-color: var(--shb-marine) !important;
+	box-shadow: 0 0 0 3px rgba(42, 111, 151, .15);
+}
+
+/* Velden-grid */
+.shb-fields {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+.shb-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--shb-navy);
+}
+
+/* Keuzekaarten (sloep / pakket / tijdslot) */
+.shb-boats,
+.shb-packages,
+.shb-slots {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 14px;
+}
+.shb-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 6px;
+	text-align: left;
+	padding: 18px;
+	min-height: 76px;
+	border: 2px solid var(--shb-line) !important;
+	border-radius: 12px;
+	background: var(--shb-white) !important;
+	cursor: pointer;
+	transition: border-color .2s ease, transform .1s ease, box-shadow .2s ease;
+	font-family: inherit;
+	width: 100%;
+}
+.shb-card:hover:not(.is-disabled):not(:disabled) {
+	border-color: var(--shb-marine) !important;
+	transform: translateY(-2px);
+	box-shadow: var(--shb-shadow);
+}
+.shb-card.is-selected {
+	border-color: var(--shb-navy) !important;
+	background: var(--shb-sand) !important;
+}
+.shb-card.is-disabled,
+.shb-card:disabled {
+	opacity: .5;
+	cursor: not-allowed;
+}
+.shb-card-name {
+	font-family: "Bebas Neue", "Hanken Grotesk", sans-serif;
+	letter-spacing: .4px;
+	font-size: 20px;
+	line-height: 1.15;
+	color: var(--shb-navy) !important;
+	white-space: normal;
+	overflow-wrap: break-word;
+}
+.shb-card-price {
+	font-size: 18px;
+	font-weight: 700;
+	color: var(--shb-marine) !important;
+}
+.shb-card-sub {
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--shb-muted) !important;
+	white-space: normal;
+	overflow-wrap: break-word;
+}
+
+/* Voorwaarden */
+.shb-terms {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin-top: 18px;
+	font-size: 14px;
+	color: var(--shb-ink);
+}
+.shb-terms input {
+	margin-top: 3px;
+	width: 18px;
+	height: 18px;
+	accent-color: var(--shb-marine);
+}
+.shb-terms a {
+	color: var(--shb-marine);
+	text-decoration: underline;
+}
+
+/* Samenvatting */
+.shb-summary {
+	margin-top: 22px;
+	padding: 18px;
+	background: var(--shb-sand);
+	border-radius: 12px;
+}
+.shb-summary h4 {
+	font-family: "Bebas Neue", "Hanken Grotesk", sans-serif;
+	letter-spacing: .4px;
+	font-size: 20px;
+	margin: 0 0 12px;
+	color: var(--shb-navy);
+}
+.shb-summary-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.shb-summary-list li {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--shb-sand-dark);
+	font-size: 15px;
+}
+.shb-summary-list li span:first-child {
+	color: var(--shb-muted);
+	flex-shrink: 0;
+}
+.shb-summary-list li span:last-child {
+	font-weight: 600;
+	color: var(--shb-ink);
+	text-align: right;
+}
+.shb-summary-total {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 14px;
+	padding-top: 12px;
+	font-size: 18px;
+}
+.shb-summary-total strong {
+	font-size: 24px;
+	color: var(--shb-navy);
+}
+
+/* Foutmelding */
+.shb-error {
+	margin-top: 18px;
+	padding: 12px 14px;
+	background: #fbeaea;
+	color: var(--shb-error);
+	border-radius: 10px;
+	font-size: 14px;
+}
+
+/* Knoppen */
+.shb-actions {
+	display: flex;
+	gap: 12px;
+	margin-top: 24px;
+	justify-content: flex-end;
+}
+.shb-btn {
+	appearance: none;
+	border: 0 !important;
+	border-radius: 10px;
+	padding: 14px 26px;
+	font-size: 16px;
+	font-weight: 700;
+	cursor: pointer;
+	font-family: inherit;
+	text-align: center;
+	transition: background .2s ease, opacity .2s ease, transform .1s ease;
+}
+.shb-btn-primary {
+	background: var(--shb-navy) !important;
+	color: var(--shb-white) !important;
+}
+.shb-btn-primary:hover:not(:disabled) {
+	background: var(--shb-marine-dark) !important;
+	transform: translateY(-1px);
+}
+.shb-btn-ghost {
+	background: var(--shb-sand) !important;
+	color: var(--shb-navy) !important;
+}
+.shb-btn-ghost:hover {
+	background: var(--shb-sand-dark) !important;
+}
+.shb-btn:disabled {
+	opacity: .45;
+	cursor: not-allowed;
+}
+
+/* Hulptekst */
+.shb-muted {
+	color: var(--shb-muted);
+	font-size: 15px;
+	margin: 0;
+}
+
+/* Datumkiezer: moderne kalender-widget i.p.v. het native datumveld */
+.shb-datepicker-wrap {
+	position: relative;
+	max-width: 360px;
+	z-index: 100;
+}
+.shb-date-trigger {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 13px 14px;
+	border: 1.5px solid var(--shb-line) !important;
+	border-radius: 10px;
+	background: var(--shb-white) !important;
+	color: var(--shb-muted) !important;
+	font-size: 16px;
+	cursor: pointer;
+	text-align: left;
+	transition: border-color .2s ease, box-shadow .2s ease;
+}
+.shb-date-trigger:hover {
+	border-color: var(--shb-marine) !important;
+}
+.shb-date-trigger[aria-expanded="true"] {
+	border-color: var(--shb-marine) !important;
+	box-shadow: 0 0 0 3px rgba(42, 111, 151, .15);
+}
+.shb-date-trigger.has-value {
+	color: var(--shb-ink) !important;
+	font-weight: 600;
+}
+.shb-date-icon {
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+	color: var(--shb-marine) !important;
+}
+
+.shb-calendar {
+	position: absolute;
+	top: calc(100% + 8px);
+	left: 0;
+	z-index: 1000;
+	width: 320px !important;
+	max-width: calc(100vw - 40px) !important;
+	background: var(--shb-white) !important;
+	border: 1px solid var(--shb-line);
+	border-radius: 14px;
+	box-shadow: 0 14px 40px rgba(18, 50, 74, .22);
+	padding: 16px;
+}
+.shb-cal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+}
+.shb-cal-title {
+	font-family: "Bebas Neue", "Hanken Grotesk", sans-serif;
+	letter-spacing: .4px;
+	font-size: 17px;
+	color: var(--shb-navy);
+	text-transform: capitalize;
+}
+.shb-cal-nav {
+	width: 32px;
+	height: 32px;
+	border-radius: 8px;
+	border: 1.5px solid var(--shb-line) !important;
+	background: var(--shb-white) !important;
+	color: var(--shb-navy) !important;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.shb-cal-nav:hover:not(:disabled) {
+	border-color: var(--shb-marine) !important;
+	background: var(--shb-sand) !important;
+}
+.shb-cal-nav:disabled {
+	opacity: .35;
+	cursor: not-allowed;
+}
+.shb-cal-weekdays {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	margin-bottom: 4px;
+}
+.shb-cal-weekdays span {
+	text-align: center;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--shb-muted);
+	text-transform: uppercase;
+}
+.shb-cal-days {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 2px;
+}
+.shb-cal-day {
+	aspect-ratio: 1 / 1;
+	min-height: 38px;
+	padding: 0 !important;
+	margin: 0 !important;
+	border: 1.5px solid transparent !important;
+	border-radius: 8px;
+	background: transparent !important;
+	color: var(--shb-ink) !important;
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.shb-cal-day:hover:not(:disabled):not(.is-selected) {
+	background: var(--shb-sand) !important;
+	border-color: var(--shb-sand-dark) !important;
+}
+.shb-cal-day.is-outside {
+	color: var(--shb-muted) !important;
+	opacity: .5;
+}
+.shb-cal-day.is-today {
+	border-color: var(--shb-marine) !important;
+	font-weight: 700;
+}
+.shb-cal-day.is-selected {
+	background: var(--shb-navy) !important;
+	color: var(--shb-white) !important;
+	font-weight: 700;
+}
+.shb-cal-day.is-disabled,
+.shb-cal-day:disabled {
+	color: var(--shb-line) !important;
+	cursor: not-allowed;
+}
+
+/* Retour-meldingen na betaling */
+.shb-notice {
+	margin-top: 20px;
+	padding: 18px 20px;
+	border-radius: 12px;
+}
+.shb-notice p {
+	margin: 6px 0 0;
+}
+.shb-notice-success {
+	background: #e4f4ec;
+	color: var(--shb-success);
+	border: 1px solid #bfe3d0;
+}
+.shb-notice-error {
+	background: #fbeaea;
+	color: var(--shb-error);
+	border: 1px solid #f0c9c9;
+}
+
+/* Mobiel */
+@media (max-width: 560px) {
+	.shb-booking {
+		padding: 20px;
+	}
+	.shb-fields {
+		grid-template-columns: 1fr;
+	}
+	.shb-actions {
+		flex-direction: column-reverse;
+	}
+	.shb-btn {
+		width: 100%;
+	}
+	.shb-step-title {
+		font-size: 23px;
+	}
+	.shb-calendar {
+		left: 50%;
+		transform: translateX(-50%);
+		width: calc(100vw - 56px) !important;
+	}
+}
