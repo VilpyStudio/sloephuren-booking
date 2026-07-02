@@ -267,6 +267,92 @@ class SHB_Bookings {
 	}
 
 	/* --------------------------------------------------------------------- */
+	/* Blokkades (dagen/periodes niet beschikbaar voor verhuur)              */
+	/* --------------------------------------------------------------------- */
+
+	/**
+	 * Alle blokkades ophalen (nieuwste periode eerst).
+	 *
+	 * @return array
+	 */
+	public static function get_blocks() {
+		global $wpdb;
+		$table = SHB_Install::table( 'blocks' );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY date_from DESC, id DESC LIMIT 300" );
+	}
+
+	/**
+	 * Blokkades die (deels) binnen een datumbereik vallen.
+	 *
+	 * @param string $from Begindatum (Y-m-d).
+	 * @param string $to   Einddatum (Y-m-d).
+	 * @return array
+	 */
+	public static function get_blocks_between( $from, $to ) {
+		global $wpdb;
+		$table = SHB_Install::table( 'blocks' );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM {$table} WHERE date_from <= %s AND date_to >= %s ORDER BY date_from ASC", $to, $from )
+		);
+	}
+
+	/**
+	 * Eén-daagse blokkade zoeken voor een exacte dag + sloep-scope.
+	 *
+	 * @param string $date         Datum (Y-m-d).
+	 * @param int    $boat_type_id Sloep-ID (0 = alle sloepen).
+	 * @return object|null
+	 */
+	public static function find_single_day_block( $date, $boat_type_id ) {
+		global $wpdb;
+		$table = SHB_Install::table( 'blocks' );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE date_from = %s AND date_to = %s AND boat_type_id = %d AND timeslot_id = 0 LIMIT 1",
+				$date,
+				$date,
+				(int) $boat_type_id
+			)
+		);
+	}
+
+	/**
+	 * Blokkade toevoegen.
+	 *
+	 * @param array $data boat_type_id, timeslot_id, date_from, date_to, note.
+	 * @return int Rij-ID.
+	 */
+	public static function add_block( $data ) {
+		global $wpdb;
+		$wpdb->insert(
+			SHB_Install::table( 'blocks' ),
+			array(
+				'boat_type_id' => (int) ( $data['boat_type_id'] ?? 0 ),
+				'timeslot_id'  => (int) ( $data['timeslot_id'] ?? 0 ),
+				'date_from'    => $data['date_from'],
+				'date_to'      => $data['date_to'],
+				'note'         => sanitize_text_field( $data['note'] ?? '' ),
+				'created_at'   => current_time( 'mysql' ),
+			),
+			array( '%d', '%d', '%s', '%s', '%s', '%s' )
+		);
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Blokkade verwijderen.
+	 *
+	 * @param int $id ID.
+	 */
+	public static function delete_block( $id ) {
+		global $wpdb;
+		$wpdb->delete( SHB_Install::table( 'blocks' ), array( 'id' => (int) $id ), array( '%d' ) );
+	}
+
+	/* --------------------------------------------------------------------- */
 	/* Boekingen                                                             */
 	/* --------------------------------------------------------------------- */
 

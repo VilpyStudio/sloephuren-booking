@@ -82,6 +82,7 @@ class SHB_Install {
 		$products   = self::table( 'products' );
 		$timeslots  = self::table( 'timeslots' );
 		$bookings   = self::table( 'bookings' );
+		$blocks     = self::table( 'blocks' );
 
 		// Sloep-types: naam, voorraad, max personen, actief.
 		$sql_boat_types = "CREATE TABLE {$boat_types} (
@@ -153,10 +154,26 @@ class SHB_Install {
 			KEY payment_id (payment_id)
 		) {$charset_collate};";
 
+		// Blokkades: dagen/periodes waarop een sloep (of alles) niet verhuurd wordt.
+		// boat_type_id 0 = alle sloepen; timeslot_id 0 = hele dag.
+		$sql_blocks = "CREATE TABLE {$blocks} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			boat_type_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			timeslot_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			date_from DATE NOT NULL DEFAULT '1970-01-01',
+			date_to DATE NOT NULL DEFAULT '1970-01-01',
+			note VARCHAR(191) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00',
+			PRIMARY KEY  (id),
+			KEY date_range (date_from,date_to),
+			KEY boat_type_id (boat_type_id)
+		) {$charset_collate};";
+
 		dbDelta( $sql_boat_types );
 		dbDelta( $sql_products );
 		dbDelta( $sql_timeslots );
 		dbDelta( $sql_bookings );
+		dbDelta( $sql_blocks );
 	}
 
 	/**

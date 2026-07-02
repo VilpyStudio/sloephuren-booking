@@ -63,6 +63,7 @@ class SHB_Admin {
 		);
 
 		add_submenu_page( 'shb-bookings', __( 'Boekingen', 'sloephuren-booking' ), __( 'Boekingen', 'sloephuren-booking' ), self::CAP, 'shb-bookings', array( $this, 'page_bookings' ) );
+		add_submenu_page( 'shb-bookings', __( 'Beschikbaarheid', 'sloephuren-booking' ), __( 'Beschikbaarheid', 'sloephuren-booking' ), self::CAP, 'shb-availability', array( $this, 'page_availability' ) );
 		add_submenu_page( 'shb-bookings', __( 'Sloep-types', 'sloephuren-booking' ), __( 'Sloep-types', 'sloephuren-booking' ), self::CAP, 'shb-boat-types', array( $this, 'page_boat_types' ) );
 		add_submenu_page( 'shb-bookings', __( 'Pakketten', 'sloephuren-booking' ), __( 'Pakketten', 'sloephuren-booking' ), self::CAP, 'shb-products', array( $this, 'page_products' ) );
 		add_submenu_page( 'shb-bookings', __( 'Tijdsloten', 'sloephuren-booking' ), __( 'Tijdsloten', 'sloephuren-booking' ), self::CAP, 'shb-timeslots', array( $this, 'page_timeslots' ) );
@@ -84,7 +85,29 @@ class SHB_Admin {
 			. '.shb-status.paid{background:#d6f0e0;color:#1f7a4d;}'
 			. '.shb-status.pending_payment{background:#fff2cc;color:#8a6d00;}'
 			. '.shb-status.failed,.shb-status.expired,.shb-status.cancelled{background:#f6d6d6;color:#a12b2b;}'
-			. '.shb-inline-form{display:inline;}';
+			. '.shb-inline-form{display:inline;}'
+			// Beschikbaarheidskalender (mobiel-vriendelijk: grote tikbare cellen).
+			. '.shb-avail-wrap{max-width:560px;}'
+			. '.shb-chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}'
+			. '.shb-chip{display:inline-block;padding:9px 16px;border-radius:999px;border:1px solid #ccd0d4;background:#fff;text-decoration:none;color:#1d2327;font-weight:600;font-size:13px;}'
+			. '.shb-chip.active{background:#15324F;border-color:#15324F;color:#fff;}'
+			. '.shb-avail-head{display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;}'
+			. '.shb-avail-head strong{font-size:17px;text-transform:uppercase;letter-spacing:.04em;}'
+			. '.shb-avail-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}'
+			. '.shb-avail-wd{text-align:center;font-size:11px;color:#787c82;padding:4px 0;text-transform:uppercase;}'
+			. '.shb-avail-grid form{margin:0;}'
+			. '.shb-avail-btn{width:100%;min-height:48px;border-radius:8px;border:1px solid #dcdcde;background:#fff;cursor:pointer;font-size:14px;font-weight:600;color:#1d2327;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;padding:4px 2px;}'
+			. '.shb-avail-btn:hover{border-color:#15324F;}'
+			. '.shb-avail-day.is-past{min-height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#c3c4c7;}'
+			. '.shb-avail-btn.is-blocked{background:#fbeaea;border-color:#e5b3b3;color:#a12b2b;text-decoration:line-through;}'
+			. '.shb-avail-btn.is-partly{background:#fdf3e0;border-color:#e8d5a9;}'
+			. '.shb-bkcount{font-size:10px;font-weight:700;color:#fff;background:#2271b1;border-radius:8px;padding:0 6px;line-height:15px;}'
+			. '.shb-avail-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#50575e;margin-top:12px;}'
+			. '.shb-avail-legend span{display:inline-flex;align-items:center;gap:5px;}'
+			. '.shb-dot{width:12px;height:12px;border-radius:4px;display:inline-block;border:1px solid #dcdcde;}'
+			. '.shb-dot.blocked{background:#fbeaea;border-color:#e5b3b3;}'
+			. '.shb-dot.partly{background:#fdf3e0;border-color:#e8d5a9;}'
+			. '@media(max-width:480px){.shb-avail-btn{min-height:44px;font-size:13px;}}';
 		wp_add_inline_style( 'common', $css );
 	}
 
@@ -128,6 +151,15 @@ class SHB_Admin {
 				break;
 			case 'update_booking_status':
 				$this->update_booking_status();
+				break;
+			case 'toggle_block_day':
+				$this->toggle_block_day();
+				break;
+			case 'add_block':
+				$this->add_block();
+				break;
+			case 'delete_block':
+				$this->delete_block();
 				break;
 		}
 	}
@@ -263,6 +295,138 @@ class SHB_Admin {
 	}
 
 	/* --------------------------------------------------------------------- */
+	/* Beschikbaarheid: blokkade-handlers                                    */
+	/* --------------------------------------------------------------------- */
+
+	/**
+	 * Datum saneren naar Y-m-d of leeg.
+	 *
+	 * @param mixed $value Ruwe invoer.
+	 * @return string
+	 */
+	protected function clean_date( $value ) {
+		$value = sanitize_text_field( wp_unslash( (string) $value ) );
+		$d     = DateTime::createFromFormat( 'Y-m-d', $value );
+		return ( $d && $d->format( 'Y-m-d' ) === $value ) ? $value : '';
+	}
+
+	/**
+	 * Terug naar het beschikbaarheidsscherm met behoud van sloep + maand.
+	 *
+	 * @param string $msg  Meldingssleutel.
+	 * @param int    $boat Sloep-scope.
+	 * @param string $ym   Maand (Y-m).
+	 */
+	protected function redirect_availability( $msg, $boat, $ym ) {
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'    => 'shb-availability',
+					'boat'    => (int) $boat,
+					'ym'      => preg_replace( '/[^0-9\-]/', '', $ym ),
+					'shb_msg' => $msg,
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+
+	/**
+	 * Dag aantikken op de kalender: blokkade aan/uit voor de gekozen scope.
+	 */
+	protected function toggle_block_day() {
+		$this->check_nonce( 'shb_toggle_block_day' );
+		$date = $this->clean_date( $_POST['date'] ?? '' );
+		$boat = isset( $_POST['boat'] ) ? (int) $_POST['boat'] : 0;
+		$ym   = sanitize_text_field( wp_unslash( $_POST['ym'] ?? '' ) );
+
+		if ( ! $date ) {
+			$this->redirect_availability( 'block_invalid', $boat, $ym );
+		}
+
+		// Bestaande eendaagse blokkade voor exact deze scope? Dan uitzetten.
+		$existing = SHB_Bookings::find_single_day_block( $date, $boat );
+		if ( $existing ) {
+			SHB_Bookings::delete_block( $existing->id );
+			$this->redirect_availability( 'day_unblocked', $boat, $ym );
+		}
+
+		// Valt de dag al onder een andere (periode- of alle-sloepen-)blokkade?
+		$covered = false;
+		foreach ( SHB_Bookings::get_blocks_between( $date, $date ) as $bl ) {
+			$scope_match = ( 0 === $boat )
+				? ( 0 === (int) $bl->boat_type_id )
+				: ( 0 === (int) $bl->boat_type_id || (int) $bl->boat_type_id === $boat );
+			if ( $scope_match ) {
+				$covered = true;
+				break;
+			}
+		}
+		if ( $covered ) {
+			$this->redirect_availability( 'block_covered', $boat, $ym );
+		}
+
+		SHB_Bookings::add_block(
+			array(
+				'boat_type_id' => $boat,
+				'timeslot_id'  => 0,
+				'date_from'    => $date,
+				'date_to'      => $date,
+				'note'         => '',
+			)
+		);
+		$this->redirect_availability( 'day_blocked', $boat, $ym );
+	}
+
+	/**
+	 * Periode blokkeren via het formulier.
+	 */
+	protected function add_block() {
+		$this->check_nonce( 'shb_add_block' );
+		$boat = isset( $_POST['boat_type_id'] ) ? (int) $_POST['boat_type_id'] : 0;
+		$from = $this->clean_date( $_POST['date_from'] ?? '' );
+		$to   = $this->clean_date( $_POST['date_to'] ?? '' );
+		$note = sanitize_text_field( wp_unslash( $_POST['note'] ?? '' ) );
+		$ym   = sanitize_text_field( wp_unslash( $_POST['ym'] ?? '' ) );
+
+		if ( ! $from ) {
+			$this->redirect_availability( 'block_invalid', $boat, $ym );
+		}
+		if ( ! $to ) {
+			$to = $from;
+		}
+		if ( $to < $from ) {
+			list( $from, $to ) = array( $to, $from );
+		}
+
+		SHB_Bookings::add_block(
+			array(
+				'boat_type_id' => $boat,
+				'timeslot_id'  => 0,
+				'date_from'    => $from,
+				'date_to'      => $to,
+				'note'         => $note,
+			)
+		);
+		$this->redirect_availability( 'block_added', $boat, $ym );
+	}
+
+	/**
+	 * Blokkade verwijderen uit de lijst.
+	 */
+	protected function delete_block() {
+		$this->check_nonce( 'shb_delete_block' );
+		$id   = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		$boat = isset( $_POST['boat'] ) ? (int) $_POST['boat'] : 0;
+		$ym   = sanitize_text_field( wp_unslash( $_POST['ym'] ?? '' ) );
+		if ( $id ) {
+			SHB_Bookings::delete_block( $id );
+		}
+		$this->redirect_availability( 'block_deleted', $boat, $ym );
+	}
+
+	/* --------------------------------------------------------------------- */
 	/* Meldingen                                                             */
 	/* --------------------------------------------------------------------- */
 
@@ -276,13 +440,22 @@ class SHB_Admin {
 			return;
 		}
 		$map = array(
-			'saved'   => __( 'Opgeslagen.', 'sloephuren-booking' ),
-			'deleted' => __( 'Verwijderd.', 'sloephuren-booking' ),
-			'updated' => __( 'Bijgewerkt.', 'sloephuren-booking' ),
+			'saved'         => __( 'Opgeslagen.', 'sloephuren-booking' ),
+			'deleted'       => __( 'Verwijderd.', 'sloephuren-booking' ),
+			'updated'       => __( 'Bijgewerkt.', 'sloephuren-booking' ),
+			'day_blocked'   => __( 'Dag geblokkeerd voor verhuur.', 'sloephuren-booking' ),
+			'day_unblocked' => __( 'Dag weer vrijgegeven voor verhuur.', 'sloephuren-booking' ),
+			'block_added'   => __( 'Periode geblokkeerd.', 'sloephuren-booking' ),
+			'block_deleted' => __( 'Blokkade verwijderd.', 'sloephuren-booking' ),
 		);
-		$text = $map[ $msg ] ?? '';
-		if ( $text ) {
-			printf( '<div class="notice notice-success is-dismissible"><p>%s</p></div>', esc_html( $text ) );
+		$warn = array(
+			'block_covered' => __( 'Deze dag valt onder een bestaande periode- of alle-sloepen-blokkade. Verwijder die blokkade onderaan de pagina.', 'sloephuren-booking' ),
+			'block_invalid' => __( 'Vul een geldige datum in.', 'sloephuren-booking' ),
+		);
+		if ( isset( $map[ $msg ] ) ) {
+			printf( '<div class="notice notice-success is-dismissible"><p>%s</p></div>', esc_html( $map[ $msg ] ) );
+		} elseif ( isset( $warn[ $msg ] ) ) {
+			printf( '<div class="notice notice-warning is-dismissible"><p>%s</p></div>', esc_html( $warn[ $msg ] ) );
 		}
 	}
 
@@ -433,6 +606,223 @@ class SHB_Admin {
 					?>
 				</div></div>
 			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/* --------------------------------------------------------------------- */
+	/* Scherm: Beschikbaarheid                                               */
+	/* --------------------------------------------------------------------- */
+
+	/**
+	 * Beschikbaarheidskalender: dagen aantikken om ze te blokkeren of vrij
+	 * te geven, plus een formulier voor langere periodes. Gebouwd met
+	 * gewone formulieren (geen JS) zodat het overal werkt, ook mobiel.
+	 */
+	public function page_availability() {
+		global $wpdb;
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$boat_scope = isset( $_GET['boat'] ) ? (int) $_GET['boat'] : 0;
+		$ym         = isset( $_GET['ym'] ) ? sanitize_text_field( wp_unslash( $_GET['ym'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		if ( ! preg_match( '/^\d{4}-\d{2}$/', $ym ) ) {
+			$ym = gmdate( 'Y-m', current_time( 'timestamp' ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
+		}
+		list( $year, $month ) = array_map( 'intval', explode( '-', $ym ) );
+
+		$first = sprintf( '%04d-%02d-01', $year, $month );
+		$dim   = (int) gmdate( 't', strtotime( $first . ' 12:00:00' ) );
+		$last  = sprintf( '%04d-%02d-%02d', $year, $month, $dim );
+		$today = gmdate( 'Y-m-d', current_time( 'timestamp' ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
+
+		$boats     = SHB_Bookings::get_boat_types( true );
+		$boat_map  = $this->id_map( SHB_Bookings::get_boat_types() );
+		$blocks    = SHB_Bookings::get_blocks_between( $first, $last );
+		$all_rows  = SHB_Bookings::get_blocks();
+
+		// Betaalde boekingen per dag (voor het telbolletje).
+		$btable = SHB_Install::table( 'bookings' );
+		if ( $boat_scope ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT booking_date d, COUNT(*) c FROM {$btable} WHERE booking_date BETWEEN %s AND %s AND status = 'paid' AND boat_type_id = %d GROUP BY booking_date", $first, $last, $boat_scope ) );
+		} else {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT booking_date d, COUNT(*) c FROM {$btable} WHERE booking_date BETWEEN %s AND %s AND status = 'paid' GROUP BY booking_date", $first, $last ) );
+		}
+		$booked_count = array();
+		foreach ( $rows as $r ) {
+			$booked_count[ $r->d ] = (int) $r->c;
+		}
+
+		// Maandnavigatie.
+		$prev_ym = gmdate( 'Y-m', mktime( 12, 0, 0, $month - 1, 1, $year ) );
+		$next_ym = gmdate( 'Y-m', mktime( 12, 0, 0, $month + 1, 1, $year ) );
+		$nav_url = function ( $to_ym, $to_boat ) {
+			return add_query_arg(
+				array(
+					'page' => 'shb-availability',
+					'boat' => (int) $to_boat,
+					'ym'   => $to_ym,
+				),
+				admin_url( 'admin.php' )
+			);
+		};
+
+		$months_nl = array( 1 => 'januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december' );
+		$lead      = ( (int) gmdate( 'N', strtotime( $first . ' 12:00:00' ) ) ) - 1; // 0 = maandag.
+		?>
+		<div class="wrap shb-avail-wrap">
+			<h1><?php esc_html_e( 'Beschikbaarheid', 'sloephuren-booking' ); ?></h1>
+			<?php $this->notice(); ?>
+			<p><?php esc_html_e( 'Tik op een dag om die te blokkeren voor verhuur, of tik nogmaals om de dag weer vrij te geven. Kies eerst voor welke sloep het geldt.', 'sloephuren-booking' ); ?></p>
+
+			<div class="shb-chips">
+				<a class="shb-chip <?php echo 0 === $boat_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, 0 ) ); ?>"><?php esc_html_e( 'Alle sloepen', 'sloephuren-booking' ); ?></a>
+				<?php foreach ( $boats as $b ) : ?>
+					<a class="shb-chip <?php echo (int) $b->id === $boat_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, $b->id ) ); ?>"><?php echo esc_html( $b->name ); ?></a>
+				<?php endforeach; ?>
+			</div>
+
+			<div class="shb-avail-head">
+				<a class="button" href="<?php echo esc_url( $nav_url( $prev_ym, $boat_scope ) ); ?>">&lsaquo;</a>
+				<strong><?php echo esc_html( $months_nl[ $month ] . ' ' . $year ); ?></strong>
+				<a class="button" href="<?php echo esc_url( $nav_url( $next_ym, $boat_scope ) ); ?>">&rsaquo;</a>
+			</div>
+
+			<div class="shb-avail-grid">
+				<?php foreach ( array( 'ma', 'di', 'wo', 'do', 'vr', 'za', 'zo' ) as $wd ) : ?>
+					<div class="shb-avail-wd"><?php echo esc_html( $wd ); ?></div>
+				<?php endforeach; ?>
+
+				<?php for ( $i = 0; $i < $lead; $i++ ) : ?>
+					<div></div>
+				<?php endfor; ?>
+
+				<?php
+				for ( $d = 1; $d <= $dim; $d++ ) :
+					$date = sprintf( '%04d-%02d-%02d', $year, $month, $d );
+
+					// Blokkade-status voor de gekozen scope bepalen.
+					$fully  = false;
+					$partly = false;
+					foreach ( $blocks as $bl ) {
+						if ( $bl->date_from > $date || $bl->date_to < $date ) {
+							continue;
+						}
+						$bl_boat = (int) $bl->boat_type_id;
+						if ( 0 === $boat_scope ) {
+							if ( 0 === $bl_boat ) {
+								$fully = true;
+							} else {
+								$partly = true;
+							}
+						} elseif ( 0 === $bl_boat || $bl_boat === $boat_scope ) {
+							$fully = true;
+						}
+					}
+
+					$count = isset( $booked_count[ $date ] ) ? $booked_count[ $date ] : 0;
+
+					if ( $date < $today ) :
+						?>
+						<div class="shb-avail-day is-past"><?php echo esc_html( $d ); ?></div>
+						<?php
+					else :
+						$classes = 'shb-avail-btn' . ( $fully ? ' is-blocked' : ( $partly ? ' is-partly' : '' ) );
+						$title   = $fully
+							? __( 'Tik om deze dag weer vrij te geven', 'sloephuren-booking' )
+							: __( 'Tik om deze dag te blokkeren', 'sloephuren-booking' );
+						?>
+						<form method="post">
+							<?php wp_nonce_field( 'shb_toggle_block_day' ); ?>
+							<input type="hidden" name="shb_action" value="toggle_block_day">
+							<input type="hidden" name="date" value="<?php echo esc_attr( $date ); ?>">
+							<input type="hidden" name="boat" value="<?php echo esc_attr( $boat_scope ); ?>">
+							<input type="hidden" name="ym" value="<?php echo esc_attr( $ym ); ?>">
+							<button type="submit" class="<?php echo esc_attr( $classes ); ?>" title="<?php echo esc_attr( $title ); ?>">
+								<span><?php echo esc_html( $d ); ?></span>
+								<?php if ( $count ) : ?>
+									<span class="shb-bkcount"><?php echo esc_html( $count ); ?></span>
+								<?php endif; ?>
+							</button>
+						</form>
+						<?php
+					endif;
+				endfor;
+				?>
+			</div>
+
+			<div class="shb-avail-legend">
+				<span><span class="shb-dot blocked"></span> <?php esc_html_e( 'Geblokkeerd', 'sloephuren-booking' ); ?></span>
+				<?php if ( 0 === $boat_scope ) : ?>
+					<span><span class="shb-dot partly"></span> <?php esc_html_e( 'Deels geblokkeerd (specifieke sloep)', 'sloephuren-booking' ); ?></span>
+				<?php endif; ?>
+				<span><span class="shb-bkcount">2</span> <?php esc_html_e( 'Aantal betaalde boekingen', 'sloephuren-booking' ); ?></span>
+			</div>
+
+			<hr style="margin:24px 0;">
+
+			<h2><?php esc_html_e( 'Periode blokkeren', 'sloephuren-booking' ); ?></h2>
+			<form method="post" class="shb-admin-form">
+				<?php wp_nonce_field( 'shb_add_block' ); ?>
+				<input type="hidden" name="shb_action" value="add_block">
+				<input type="hidden" name="ym" value="<?php echo esc_attr( $ym ); ?>">
+				<label><?php esc_html_e( 'Sloep', 'sloephuren-booking' ); ?></label>
+				<select name="boat_type_id">
+					<option value="0"><?php esc_html_e( 'Alle sloepen', 'sloephuren-booking' ); ?></option>
+					<?php foreach ( $boats as $b ) : ?>
+						<option value="<?php echo esc_attr( $b->id ); ?>" <?php selected( $boat_scope, (int) $b->id ); ?>><?php echo esc_html( $b->name ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<label><?php esc_html_e( 'Van', 'sloephuren-booking' ); ?></label>
+				<input type="date" name="date_from" required>
+				<label><?php esc_html_e( 'Tot en met', 'sloephuren-booking' ); ?></label>
+				<input type="date" name="date_to">
+				<label><?php esc_html_e( 'Notitie (optioneel)', 'sloephuren-booking' ); ?></label>
+				<input type="text" name="note" placeholder="<?php esc_attr_e( 'bijv. onderhoud of vakantie', 'sloephuren-booking' ); ?>">
+				<p><button class="button button-primary"><?php esc_html_e( 'Blokkeer periode', 'sloephuren-booking' ); ?></button></p>
+			</form>
+
+			<h2><?php esc_html_e( 'Actieve blokkades', 'sloephuren-booking' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped">
+				<thead><tr>
+					<th><?php esc_html_e( 'Periode', 'sloephuren-booking' ); ?></th>
+					<th><?php esc_html_e( 'Sloep', 'sloephuren-booking' ); ?></th>
+					<th><?php esc_html_e( 'Notitie', 'sloephuren-booking' ); ?></th>
+					<th style="width:110px;"><?php esc_html_e( 'Actie', 'sloephuren-booking' ); ?></th>
+				</tr></thead>
+				<tbody>
+				<?php if ( empty( $all_rows ) ) : ?>
+					<tr><td colspan="4"><?php esc_html_e( 'Nog geen blokkades. Alle dagen zijn boekbaar.', 'sloephuren-booking' ); ?></td></tr>
+				<?php else : ?>
+					<?php foreach ( $all_rows as $bl ) : ?>
+						<tr>
+							<td>
+								<?php
+								$from_txt = date_i18n( 'd-m-Y', strtotime( $bl->date_from ) );
+								$to_txt   = date_i18n( 'd-m-Y', strtotime( $bl->date_to ) );
+								echo esc_html( $bl->date_from === $bl->date_to ? $from_txt : $from_txt . ' t/m ' . $to_txt );
+								?>
+							</td>
+							<td><?php echo esc_html( (int) $bl->boat_type_id ? ( isset( $boat_map[ (int) $bl->boat_type_id ] ) ? $boat_map[ (int) $bl->boat_type_id ]->name : '#' . (int) $bl->boat_type_id ) : __( 'Alle sloepen', 'sloephuren-booking' ) ); ?></td>
+							<td><?php echo esc_html( $bl->note ); ?></td>
+							<td>
+								<form method="post" class="shb-inline-form">
+									<?php wp_nonce_field( 'shb_delete_block' ); ?>
+									<input type="hidden" name="shb_action" value="delete_block">
+									<input type="hidden" name="id" value="<?php echo esc_attr( $bl->id ); ?>">
+									<input type="hidden" name="boat" value="<?php echo esc_attr( $boat_scope ); ?>">
+									<input type="hidden" name="ym" value="<?php echo esc_attr( $ym ); ?>">
+									<button class="button button-small button-link-delete"><?php esc_html_e( 'Verwijder', 'sloephuren-booking' ); ?></button>
+								</form>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+				</tbody>
+			</table>
 		</div>
 		<?php
 	}

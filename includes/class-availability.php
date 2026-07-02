@@ -57,6 +57,37 @@ class SHB_Availability {
 	}
 
 	/**
+	 * Is een combinatie geblokkeerd door een beheerder-blokkade?
+	 *
+	 * Een blokkade geldt wanneer de datum binnen de periode valt en de
+	 * blokkade op alle sloepen (0) of op deze specifieke sloep staat, en
+	 * op de hele dag (0) of op dit specifieke tijdslot.
+	 *
+	 * @param string $date         Datum (Y-m-d).
+	 * @param int    $timeslot_id  Tijdslot-ID.
+	 * @param int    $boat_type_id Sloep-ID.
+	 * @return bool
+	 */
+	public static function is_blocked( $date, $timeslot_id, $boat_type_id ) {
+		global $wpdb;
+		$table = SHB_Install::table( 'blocks' );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$table}
+				WHERE date_from <= %s AND date_to >= %s
+				  AND ( boat_type_id = 0 OR boat_type_id = %d )
+				  AND ( timeslot_id = 0 OR timeslot_id = %d )",
+				$date,
+				$date,
+				(int) $boat_type_id,
+				(int) $timeslot_id
+			)
+		);
+		return $count > 0;
+	}
+
+	/**
 	 * Resterende beschikbaarheid voor een combinatie.
 	 *
 	 * @param object $boat_type    Sloep-type-object.
@@ -65,8 +96,110 @@ class SHB_Availability {
 	 * @return int Aantal nog vrije plekken (>= 0).
 	 */
 	public static function remaining( $boat_type, $date, $timeslot_id ) {
+		if ( self::is_blocked( $date, (int) $timeslot_id, (int) $boat_type->id ) ) {
+			return 0;
+		}
 		$taken = self::count_taken( $date, (int) $timeslot_id, (int) $boat_type->id );
 		return max( 0, (int) $boat_type->stock - $taken );
+	}
+
+	/**
+	 * Niet-beschikbare dagen van een maand (voor de widget-kalender).
+	 *
+	 * Een dag is niet beschikbaar wanneer geen enkel tijdslot van het pakket
+	 * nog een vrije sloep heeft (door blokkades en/of boekingen). Alles wordt
+	 * met twee aggregatie-queries opgehaald zodat dit één snelle call blijft.
+	 *
+	 * @param int $product_id   Pakket-ID.
+	 * @param int $year         Jaar.
+	 * @param int $month        Maand (1-12).
+	 * @param int $boat_type_id Optioneel: alleen deze sloep meetellen.
+	 * @return array Lijst ISO-datums (Y-m-d) die niet beschikbaar zijn.
+	 */
+	public static function get_month_unavailable_days( $product_id, $year, $month, $boat_type_id = 0 ) {
+		global $wpdb;
+
+		$year  = (int) $year;
+		$month = (int) $month;
+		$first = sprintf( '%04d-%02d-01', $year, $month );
+		$dim   = (int) gmdate( 't', strtotime( $first . ' 12:00:00' ) );
+		$last  = sprintf( '%04d-%02d-%02d', $year, $month, $dim );
+
+		$slots = SHB_Bookings::get_timeslots( (int) $product_id, true );
+		$boat  = $boat_type_id ? SHB_Bookings::get_boat_type( (int) $boat_type_id ) : null;
+		$boats = ( $boat && $boat->active ) ? array( $boat ) : SHB_Bookings::get_boat_types( true );
+
+		if ( ! $slots || ! $boats ) {
+			return array();
+		}
+
+		// Bezette plekken per dag/tijdslot/sloep in één query.
+		$btable  = SHB_Install::table( 'bookings' );
+		$minutes = (int) get_option( 'shb_pending_minutes', 15 );
+		$cutoff  = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( $minutes * MINUTE_IN_SECONDS ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT booking_date d, timeslot_id t, boat_type_id b, COUNT(*) c FROM {$btable}
+				WHERE booking_date BETWEEN %s AND %s
+				  AND ( status = 'paid' OR ( status = 'pending_payment' AND created_at >= %s ) )
+				GROUP BY booking_date, timeslot_id, boat_type_id",
+				$first,
+				$last,
+				$cutoff
+			)
+		);
+		$taken = array();
+		foreach ( $rows as $r ) {
+			$taken[ $r->d . '|' . $r->t . '|' . $r->b ] = (int) $r->c;
+		}
+
+		$blocks      = SHB_Bookings::get_blocks_between( $first, $last );
+		$unavailable = array();
+
+		for ( $d = 1; $d <= $dim; $d++ ) {
+			$date = sprintf( '%04d-%02d-%02d', $year, $month, $d );
+			$free = false;
+			foreach ( $slots as $slot ) {
+				foreach ( $boats as $bt ) {
+					if ( self::block_covers( $blocks, $date, (int) $slot->id, (int) $bt->id ) ) {
+						continue;
+					}
+					$key = $date . '|' . $slot->id . '|' . $bt->id;
+					$c   = isset( $taken[ $key ] ) ? $taken[ $key ] : 0;
+					if ( ( (int) $bt->stock - $c ) > 0 ) {
+						$free = true;
+						break 2;
+					}
+				}
+			}
+			if ( ! $free ) {
+				$unavailable[] = $date;
+			}
+		}
+
+		return $unavailable;
+	}
+
+	/**
+	 * Dekt één van de (reeds opgehaalde) blokkades deze combinatie af?
+	 *
+	 * @param array  $blocks       Blokkade-rijen.
+	 * @param string $date         Datum.
+	 * @param int    $timeslot_id  Tijdslot-ID.
+	 * @param int    $boat_type_id Sloep-ID.
+	 * @return bool
+	 */
+	protected static function block_covers( $blocks, $date, $timeslot_id, $boat_type_id ) {
+		foreach ( $blocks as $bl ) {
+			if ( $bl->date_from <= $date && $bl->date_to >= $date
+				&& ( 0 === (int) $bl->boat_type_id || (int) $bl->boat_type_id === $boat_type_id )
+				&& ( 0 === (int) $bl->timeslot_id || (int) $bl->timeslot_id === $timeslot_id ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -162,6 +295,11 @@ class SHB_Availability {
 			$boat = SHB_Bookings::get_boat_type( $boat_type_id );
 			if ( ! $boat || ! $boat->active ) {
 				return new WP_Error( 'shb_boat_invalid', __( 'Deze sloep is niet beschikbaar.', 'sloephuren-booking' ) );
+			}
+
+			// Beheerder-blokkade (onderhoud, gesloten, privegebruik).
+			if ( self::is_blocked( $date, $timeslot_id, $boat_type_id ) ) {
+				return new WP_Error( 'shb_blocked', __( 'Deze sloep is op de gekozen datum niet beschikbaar voor verhuur. Kies een andere dag.', 'sloephuren-booking' ) );
 			}
 
 			// Nog één keer controleren binnen de lock.

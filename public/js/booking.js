@@ -82,6 +82,31 @@
 
 	var autoTimer = null;
 
+	// Cache van niet-beschikbare dagen per pakket/sloep/maand (ISO-datums).
+	var monthCache = {};
+
+	function monthCacheKey( y, m ) {
+		return state.pakket + '|' + ( state.sloep || 0 ) + '|' + y + '-' + ( m + 1 );
+	}
+
+	function loadMonthAvailability( y, m ) {
+		var key = monthCacheKey( y, m );
+		if ( monthCache[ key ] !== undefined ) { return; }
+		monthCache[ key ] = null; // bezig met laden
+		api( '/month', {
+			product_id: state.pakket,
+			boat_type_id: state.sloep || 0,
+			year: y,
+			month: m + 1
+		} ).then( function ( r ) {
+			monthCache[ key ] = ( r.ok && r.data.unavailable ) ? r.data.unavailable : [];
+			// Kalender verversen zodra de data binnen is.
+			if ( state.open && state.fase === 'form' && effStep() === 3 ) { render(); }
+		} ).catch( function () {
+			monthCache[ key ] = [];
+		} );
+	}
+
 	/* ----------------------------------------------------------------- */
 	/* Helpers                                                            */
 	/* ----------------------------------------------------------------- */
@@ -456,6 +481,10 @@
 		var dim = new Date( y, m + 1, 0 ).getDate();
 		var prevAllowed = y > today.getFullYear() || ( y === today.getFullYear() && m > today.getMonth() );
 
+		// Niet-beschikbare dagen (blokkades + volgeboekt) voor deze maand ophalen.
+		loadMonthAvailability( y, m );
+		var unavailable = monthCache[ monthCacheKey( y, m ) ] || [];
+
 		var grid = el( 'div', { 'class': 'shb-cal-grid' } );
 		for ( var i = 0; i < lead; i++ ) { grid.appendChild( el( 'div', { 'class': 'shb-cal-day is-empty' } ) ); }
 		for ( var d = 1; d <= dim; d++ ) {
@@ -463,16 +492,19 @@
 				var dt = new Date( y, m, day );
 				var isoD = iso( y, m, day );
 				var past = dt < today;
+				var booked = ! past && unavailable.indexOf( isoD ) !== -1;
 				var selected = state.datum === isoD;
 				var isToday = dt.getTime() === today.getTime();
+				var clickable = ! past && ! booked;
 				var cls = 'shb-cal-day';
 				if ( past ) { cls += ' is-past'; }
+				if ( booked ) { cls += ' is-booked'; }
 				if ( selected ) { cls += ' is-selected'; }
 				if ( isToday && ! selected ) { cls += ' is-today'; }
 				grid.appendChild( el( 'div', {
 					'class': cls,
 					text: String( day ),
-					onclick: past ? null : function () { setState( { datum: isoD, slot: null } ); autoAdvance(); }
+					onclick: clickable ? function () { setState( { datum: isoD, slot: null } ); autoAdvance(); } : null
 				} ) );
 			} )( d );
 		}
@@ -495,7 +527,7 @@
 				] ),
 				wd,
 				grid,
-				el( 'div', { 'class': 'shb-cal-foot', text: 'Kies een vrije dag; beschikbare tijden zie je bij de volgende stap.' } )
+				el( 'div', { 'class': 'shb-cal-foot', text: 'Doorgestreepte dagen zijn niet beschikbaar.' } )
 			] )
 		] );
 	}

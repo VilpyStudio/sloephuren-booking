@@ -276,6 +276,17 @@ class SHB_Plugin {
 			)
 		);
 
+		// Niet-beschikbare dagen per maand (voor de widget-kalender).
+		register_rest_route(
+			self::REST_NS,
+			'/month',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'rest_month' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
 		// Boeking + betaling starten.
 		register_rest_route(
 			self::REST_NS,
@@ -346,6 +357,26 @@ class SHB_Plugin {
 
 		$boats = SHB_Availability::get_available_boat_types( $product_id, $date, $timeslot_id );
 		return new WP_REST_Response( array( 'boats' => $boats ), 200 );
+	}
+
+	/**
+	 * REST: niet-beschikbare dagen van een maand teruggeven.
+	 *
+	 * @param WP_REST_Request $request Verzoek.
+	 * @return WP_REST_Response
+	 */
+	public function rest_month( $request ) {
+		$product_id = (int) $request->get_param( 'product_id' );
+		$year       = (int) $request->get_param( 'year' );
+		$month      = (int) $request->get_param( 'month' );
+		$boat_id    = (int) $request->get_param( 'boat_type_id' );
+
+		if ( ! $product_id || $year < 2020 || $year > 2100 || $month < 1 || $month > 12 ) {
+			return new WP_REST_Response( array( 'error' => __( 'Ongeldige aanvraag.', 'sloephuren-booking' ) ), 400 );
+		}
+
+		$unavailable = SHB_Availability::get_month_unavailable_days( $product_id, $year, $month, $boat_id );
+		return new WP_REST_Response( array( 'unavailable' => $unavailable ), 200 );
 	}
 
 	/**

@@ -3,6 +3,13 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.2.0] - 2026-07-02
+
+### Added
+- Admin-scherm **Beschikbaarheid**: mobiel-vriendelijke maandkalender waarop je per sloep (of alle sloepen) dagen aantikt om ze te blokkeren voor verhuur en weer vrij te geven. Plus een formulier voor langere periodes (met notitie) en een lijst met actieve blokkades.
+- Blokkades tellen overal mee: geblokkeerde dagen/sloepen zijn niet boekbaar (ook afgedwongen binnen de boek-lock) en de widget-kalender toont niet-beschikbare dagen doorgestreept via het nieuwe REST-endpoint `/month`.
+- Dagen met betaalde boekingen tonen een teller in de admin-kalender.
+
 ## [2.1.0] - 2026-07-01
 
 ### Added
