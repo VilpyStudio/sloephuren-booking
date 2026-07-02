@@ -299,22 +299,24 @@ class SHB_Bookings {
 	}
 
 	/**
-	 * Eén-daagse blokkade zoeken voor een exacte dag + sloep-scope.
+	 * Eén-daagse blokkade zoeken voor een exacte dag + sloep-scope + dagdeel.
 	 *
 	 * @param string $date         Datum (Y-m-d).
 	 * @param int    $boat_type_id Sloep-ID (0 = alle sloepen).
+	 * @param int    $timeslot_id  Tijdslot-ID (0 = hele dag).
 	 * @return object|null
 	 */
-	public static function find_single_day_block( $date, $boat_type_id ) {
+	public static function find_single_day_block( $date, $boat_type_id, $timeslot_id = 0 ) {
 		global $wpdb;
 		$table = SHB_Install::table( 'blocks' );
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE date_from = %s AND date_to = %s AND boat_type_id = %d AND timeslot_id = 0 LIMIT 1",
+				"SELECT * FROM {$table} WHERE date_from = %s AND date_to = %s AND boat_type_id = %d AND timeslot_id = %d LIMIT 1",
 				$date,
 				$date,
-				(int) $boat_type_id
+				(int) $boat_type_id,
+				(int) $timeslot_id
 			)
 		);
 	}

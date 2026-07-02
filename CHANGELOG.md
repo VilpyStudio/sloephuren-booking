@@ -3,6 +3,12 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.3.0] - 2026-07-02
+
+### Added
+- Blokkeren per **dagdeel**: in het Beschikbaarheid-scherm kies je naast "Hele dag" nu ook Ochtend of Middag. Tik daarna dagen aan zoals altijd; het periode-formulier heeft dezelfde dagdeel-keuze. Deels geblokkeerde dagen tonen amber met een letter (O/M).
+- Slimme tijd-overlap: een ochtend-blokkade blokkeert ook "Hele dag varen" (die de ochtend nodig heeft), maar laat de middag gewoon boekbaar. Geldt overal: widget, REST en de boek-lock.
+
 ## [2.2.0] - 2026-07-02
 
 ### Added

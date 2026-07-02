@@ -57,11 +57,41 @@ class SHB_Availability {
 	}
 
 	/**
+	 * Start-/eindtijden van alle tijdsloten (cache per request).
+	 *
+	 * @return array id => array( start, end ).
+	 */
+	public static function slot_times() {
+		static $map = null;
+		if ( null === $map ) {
+			$map = array();
+			foreach ( SHB_Bookings::get_timeslots() as $slot ) {
+				$map[ (int) $slot->id ] = array( $slot->start_time, $slot->end_time );
+			}
+		}
+		return $map;
+	}
+
+	/**
+	 * Overlappen twee tijdvakken elkaar?
+	 *
+	 * @param array $a array( start, end ) als H:i:s-strings.
+	 * @param array $b array( start, end ).
+	 * @return bool
+	 */
+	protected static function times_overlap( $a, $b ) {
+		return $a[0] < $b[1] && $b[0] < $a[1];
+	}
+
+	/**
 	 * Is een combinatie geblokkeerd door een beheerder-blokkade?
 	 *
 	 * Een blokkade geldt wanneer de datum binnen de periode valt en de
-	 * blokkade op alle sloepen (0) of op deze specifieke sloep staat, en
-	 * op de hele dag (0) of op dit specifieke tijdslot.
+	 * blokkade op alle sloepen (0) of op deze specifieke sloep staat. Voor
+	 * het tijdvak geldt OVERLAP: een hele-dag-blokkade (timeslot 0) raakt
+	 * alles, en een dagdeel-blokkade raakt elk tijdslot dat er qua tijden
+	 * mee overlapt. Zo blokkeert een ochtend-blokkade ook de hele-dag-
+	 * verhuur (die de ochtend nodig heeft), maar niet de middag.
 	 *
 	 * @param string $date         Datum (Y-m-d).
 	 * @param int    $timeslot_id  Tijdslot-ID.
@@ -72,19 +102,33 @@ class SHB_Availability {
 		global $wpdb;
 		$table = SHB_Install::table( 'blocks' );
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$count = (int) $wpdb->get_var(
+		$blocks = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table}
+				"SELECT timeslot_id FROM {$table}
 				WHERE date_from <= %s AND date_to >= %s
-				  AND ( boat_type_id = 0 OR boat_type_id = %d )
-				  AND ( timeslot_id = 0 OR timeslot_id = %d )",
+				  AND ( boat_type_id = 0 OR boat_type_id = %d )",
 				$date,
 				$date,
-				(int) $boat_type_id,
-				(int) $timeslot_id
+				(int) $boat_type_id
 			)
 		);
-		return $count > 0;
+		if ( ! $blocks ) {
+			return false;
+		}
+
+		$times = self::slot_times();
+		$req   = isset( $times[ (int) $timeslot_id ] ) ? $times[ (int) $timeslot_id ] : null;
+
+		foreach ( $blocks as $bl ) {
+			$bl_slot = (int) $bl->timeslot_id;
+			if ( 0 === $bl_slot ) {
+				return true; // Hele dag geblokkeerd.
+			}
+			if ( $req && isset( $times[ $bl_slot ] ) && self::times_overlap( $req, $times[ $bl_slot ] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -185,6 +229,9 @@ class SHB_Availability {
 	/**
 	 * Dekt één van de (reeds opgehaalde) blokkades deze combinatie af?
 	 *
+	 * Zelfde overlap-semantiek als is_blocked(): hele-dag-blokkades raken
+	 * alles, dagdeel-blokkades raken elk tijdslot dat qua tijden overlapt.
+	 *
 	 * @param array  $blocks       Blokkade-rijen.
 	 * @param string $date         Datum.
 	 * @param int    $timeslot_id  Tijdslot-ID.
@@ -192,14 +239,72 @@ class SHB_Availability {
 	 * @return bool
 	 */
 	protected static function block_covers( $blocks, $date, $timeslot_id, $boat_type_id ) {
+		$times = self::slot_times();
+		$req   = isset( $times[ (int) $timeslot_id ] ) ? $times[ (int) $timeslot_id ] : null;
+
 		foreach ( $blocks as $bl ) {
-			if ( $bl->date_from <= $date && $bl->date_to >= $date
-				&& ( 0 === (int) $bl->boat_type_id || (int) $bl->boat_type_id === $boat_type_id )
-				&& ( 0 === (int) $bl->timeslot_id || (int) $bl->timeslot_id === $timeslot_id ) ) {
+			if ( $bl->date_from > $date || $bl->date_to < $date ) {
+				continue;
+			}
+			if ( 0 !== (int) $bl->boat_type_id && (int) $bl->boat_type_id !== $boat_type_id ) {
+				continue;
+			}
+			$bl_slot = (int) $bl->timeslot_id;
+			if ( 0 === $bl_slot ) {
+				return true;
+			}
+			if ( $req && isset( $times[ $bl_slot ] ) && self::times_overlap( $req, $times[ $bl_slot ] ) ) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * De blokkeerbare dagdelen voor het beheerscherm.
+	 *
+	 * Unieke tijdvakken uit de actieve tijdsloten; tijdvakken die met alle
+	 * andere dagdelen overlappen (zoals het hele-dag-vaarslot) vallen weg,
+	 * want die zijn gelijkwaardig aan een hele-dag-blokkade.
+	 *
+	 * @return array Lijst van array( id, label, start, end ).
+	 */
+	public static function get_blockable_dayparts() {
+		$unique = array();
+		foreach ( SHB_Bookings::get_timeslots( 0, true ) as $slot ) {
+			$key = $slot->start_time . '|' . $slot->end_time;
+			if ( ! isset( $unique[ $key ] ) ) {
+				$unique[ $key ] = array(
+					'id'    => (int) $slot->id,
+					'label' => preg_replace( '/\s*\(.*\)\s*$/', '', $slot->label ),
+					'start' => $slot->start_time,
+					'end'   => $slot->end_time,
+				);
+			}
+		}
+		$parts = array_values( $unique );
+		if ( count( $parts ) < 2 ) {
+			return $parts;
+		}
+
+		// Dagdelen die alle andere overlappen eruit filteren.
+		$filtered = array();
+		foreach ( $parts as $p ) {
+			$overlaps_all = true;
+			foreach ( $parts as $other ) {
+				if ( $other['id'] === $p['id'] ) {
+					continue;
+				}
+				if ( ! self::times_overlap( array( $p['start'], $p['end'] ), array( $other['start'], $other['end'] ) ) ) {
+					$overlaps_all = false;
+					break;
+				}
+			}
+			if ( ! $overlaps_all ) {
+				$filtered[] = $p;
+			}
+		}
+		return $filtered ? $filtered : $parts;
 	}
 
 	/**

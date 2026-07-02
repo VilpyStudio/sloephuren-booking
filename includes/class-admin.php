@@ -101,6 +101,10 @@ class SHB_Admin {
 			. '.shb-avail-day.is-past{min-height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#c3c4c7;}'
 			. '.shb-avail-btn.is-blocked{background:#fbeaea;border-color:#e5b3b3;color:#a12b2b;text-decoration:line-through;}'
 			. '.shb-avail-btn.is-partly{background:#fdf3e0;border-color:#e8d5a9;}'
+			. '.shb-avail-btn.is-partday{background:#fdeed2;border-color:#e0b96a;color:#8a5a00;}'
+			. '.shb-partmark{font-size:10px;font-weight:700;color:#8a5a00;letter-spacing:.08em;}'
+			. '.shb-chips-slot .shb-chip{font-size:12px;padding:7px 13px;}'
+			. '.shb-dot.partday{background:#fdeed2;border-color:#e0b96a;}'
 			. '.shb-bkcount{font-size:10px;font-weight:700;color:#fff;background:#2271b1;border-radius:8px;padding:0 6px;line-height:15px;}'
 			. '.shb-avail-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#50575e;margin-top:12px;}'
 			. '.shb-avail-legend span{display:inline-flex;align-items:center;gap:5px;}'
@@ -311,19 +315,21 @@ class SHB_Admin {
 	}
 
 	/**
-	 * Terug naar het beschikbaarheidsscherm met behoud van sloep + maand.
+	 * Terug naar het beschikbaarheidsscherm met behoud van sloep, maand en dagdeel.
 	 *
 	 * @param string $msg  Meldingssleutel.
 	 * @param int    $boat Sloep-scope.
 	 * @param string $ym   Maand (Y-m).
+	 * @param int    $slot Dagdeel-scope (0 = hele dag).
 	 */
-	protected function redirect_availability( $msg, $boat, $ym ) {
+	protected function redirect_availability( $msg, $boat, $ym, $slot = 0 ) {
 		wp_safe_redirect(
 			add_query_arg(
 				array(
 					'page'    => 'shb-availability',
 					'boat'    => (int) $boat,
 					'ym'      => preg_replace( '/[^0-9\-]/', '', $ym ),
+					'slot'    => (int) $slot,
 					'shb_msg' => $msg,
 				),
 				admin_url( 'admin.php' )
@@ -333,50 +339,80 @@ class SHB_Admin {
 	}
 
 	/**
-	 * Dag aantikken op de kalender: blokkade aan/uit voor de gekozen scope.
+	 * Valt dit dagdeel al onder een andere blokkade voor deze scope?
+	 *
+	 * Hele-dag-blokkades raken elk dagdeel; dagdeel-blokkades raken elkaar
+	 * wanneer de tijden overlappen (zelfde regels als de frontend).
+	 *
+	 * @param string $date    Datum.
+	 * @param int    $boat    Sloep-scope (0 = alle sloepen).
+	 * @param int    $slot    Dagdeel (0 = hele dag).
+	 * @param int    $skip_id Blokkade-ID om te negeren.
+	 * @return bool
+	 */
+	protected function scope_covered( $date, $boat, $slot, $skip_id = 0 ) {
+		$times = SHB_Availability::slot_times();
+		$req   = $slot && isset( $times[ $slot ] ) ? $times[ $slot ] : null;
+
+		foreach ( SHB_Bookings::get_blocks_between( $date, $date ) as $bl ) {
+			if ( (int) $bl->id === (int) $skip_id ) {
+				continue;
+			}
+			$bl_boat     = (int) $bl->boat_type_id;
+			$scope_match = ( 0 === $boat ) ? ( 0 === $bl_boat ) : ( 0 === $bl_boat || $bl_boat === $boat );
+			if ( ! $scope_match ) {
+				continue;
+			}
+			$bl_slot = (int) $bl->timeslot_id;
+			if ( 0 === $bl_slot ) {
+				return true; // Hele-dag-blokkade dekt elk dagdeel.
+			}
+			if ( 0 === $slot ) {
+				continue; // Dagdeel-blokkade dekt niet de hele dag.
+			}
+			if ( $req && isset( $times[ $bl_slot ] ) && $req[0] < $times[ $bl_slot ][1] && $times[ $bl_slot ][0] < $req[1] ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Dag aantikken op de kalender: blokkade aan/uit voor scope + dagdeel.
 	 */
 	protected function toggle_block_day() {
 		$this->check_nonce( 'shb_toggle_block_day' );
 		$date = $this->clean_date( $_POST['date'] ?? '' );
 		$boat = isset( $_POST['boat'] ) ? (int) $_POST['boat'] : 0;
+		$slot = isset( $_POST['slot'] ) ? (int) $_POST['slot'] : 0;
 		$ym   = sanitize_text_field( wp_unslash( $_POST['ym'] ?? '' ) );
 
 		if ( ! $date ) {
-			$this->redirect_availability( 'block_invalid', $boat, $ym );
+			$this->redirect_availability( 'block_invalid', $boat, $ym, $slot );
 		}
 
-		// Bestaande eendaagse blokkade voor exact deze scope? Dan uitzetten.
-		$existing = SHB_Bookings::find_single_day_block( $date, $boat );
+		// Bestaande eendaagse blokkade voor exact deze scope + dagdeel? Uitzetten.
+		$existing = SHB_Bookings::find_single_day_block( $date, $boat, $slot );
 		if ( $existing ) {
 			SHB_Bookings::delete_block( $existing->id );
-			$this->redirect_availability( 'day_unblocked', $boat, $ym );
+			$this->redirect_availability( 'day_unblocked', $boat, $ym, $slot );
 		}
 
-		// Valt de dag al onder een andere (periode- of alle-sloepen-)blokkade?
-		$covered = false;
-		foreach ( SHB_Bookings::get_blocks_between( $date, $date ) as $bl ) {
-			$scope_match = ( 0 === $boat )
-				? ( 0 === (int) $bl->boat_type_id )
-				: ( 0 === (int) $bl->boat_type_id || (int) $bl->boat_type_id === $boat );
-			if ( $scope_match ) {
-				$covered = true;
-				break;
-			}
-		}
-		if ( $covered ) {
-			$this->redirect_availability( 'block_covered', $boat, $ym );
+		// Al gedekt door een andere blokkade (periode, hele dag, overlappend dagdeel)?
+		if ( $this->scope_covered( $date, $boat, $slot ) ) {
+			$this->redirect_availability( 'block_covered', $boat, $ym, $slot );
 		}
 
 		SHB_Bookings::add_block(
 			array(
 				'boat_type_id' => $boat,
-				'timeslot_id'  => 0,
+				'timeslot_id'  => $slot,
 				'date_from'    => $date,
 				'date_to'      => $date,
 				'note'         => '',
 			)
 		);
-		$this->redirect_availability( 'day_blocked', $boat, $ym );
+		$this->redirect_availability( 'day_blocked', $boat, $ym, $slot );
 	}
 
 	/**
@@ -385,13 +421,14 @@ class SHB_Admin {
 	protected function add_block() {
 		$this->check_nonce( 'shb_add_block' );
 		$boat = isset( $_POST['boat_type_id'] ) ? (int) $_POST['boat_type_id'] : 0;
+		$slot = isset( $_POST['timeslot_id'] ) ? (int) $_POST['timeslot_id'] : 0;
 		$from = $this->clean_date( $_POST['date_from'] ?? '' );
 		$to   = $this->clean_date( $_POST['date_to'] ?? '' );
 		$note = sanitize_text_field( wp_unslash( $_POST['note'] ?? '' ) );
 		$ym   = sanitize_text_field( wp_unslash( $_POST['ym'] ?? '' ) );
 
 		if ( ! $from ) {
-			$this->redirect_availability( 'block_invalid', $boat, $ym );
+			$this->redirect_availability( 'block_invalid', $boat, $ym, $slot );
 		}
 		if ( ! $to ) {
 			$to = $from;
@@ -403,13 +440,13 @@ class SHB_Admin {
 		SHB_Bookings::add_block(
 			array(
 				'boat_type_id' => $boat,
-				'timeslot_id'  => 0,
+				'timeslot_id'  => $slot,
 				'date_from'    => $from,
 				'date_to'      => $to,
 				'note'         => $note,
 			)
 		);
-		$this->redirect_availability( 'block_added', $boat, $ym );
+		$this->redirect_availability( 'block_added', $boat, $ym, $slot );
 	}
 
 	/**
@@ -419,11 +456,12 @@ class SHB_Admin {
 		$this->check_nonce( 'shb_delete_block' );
 		$id   = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
 		$boat = isset( $_POST['boat'] ) ? (int) $_POST['boat'] : 0;
+		$slot = isset( $_POST['slot'] ) ? (int) $_POST['slot'] : 0;
 		$ym   = sanitize_text_field( wp_unslash( $_POST['ym'] ?? '' ) );
 		if ( $id ) {
 			SHB_Bookings::delete_block( $id );
 		}
-		$this->redirect_availability( 'block_deleted', $boat, $ym );
+		$this->redirect_availability( 'block_deleted', $boat, $ym, $slot );
 	}
 
 	/* --------------------------------------------------------------------- */
@@ -449,7 +487,7 @@ class SHB_Admin {
 			'block_deleted' => __( 'Blokkade verwijderd.', 'sloephuren-booking' ),
 		);
 		$warn = array(
-			'block_covered' => __( 'Deze dag valt onder een bestaande periode- of alle-sloepen-blokkade. Verwijder die blokkade onderaan de pagina.', 'sloephuren-booking' ),
+			'block_covered' => __( 'Dit valt al onder een bestaande blokkade (periode, hele dag of overlappend dagdeel). Verwijder die blokkade onderaan de pagina of wissel van dagdeel-stand.', 'sloephuren-booking' ),
 			'block_invalid' => __( 'Vul een geldige datum in.', 'sloephuren-booking' ),
 		);
 		if ( isset( $map[ $msg ] ) ) {
@@ -624,8 +662,17 @@ class SHB_Admin {
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$boat_scope = isset( $_GET['boat'] ) ? (int) $_GET['boat'] : 0;
+		$slot_scope = isset( $_GET['slot'] ) ? (int) $_GET['slot'] : 0;
 		$ym         = isset( $_GET['ym'] ) ? sanitize_text_field( wp_unslash( $_GET['ym'] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		// Blokkeerbare dagdelen (bijv. ochtend/middag) + tijden-lookup.
+		$dayparts = SHB_Availability::get_blockable_dayparts();
+		$times    = SHB_Availability::slot_times();
+		$part_ids = wp_list_pluck( $dayparts, 'id' );
+		if ( $slot_scope && ! in_array( $slot_scope, $part_ids, true ) ) {
+			$slot_scope = 0;
+		}
 
 		if ( ! preg_match( '/^\d{4}-\d{2}$/', $ym ) ) {
 			$ym = gmdate( 'Y-m', current_time( 'timestamp' ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
@@ -639,6 +686,7 @@ class SHB_Admin {
 
 		$boats     = SHB_Bookings::get_boat_types( true );
 		$boat_map  = $this->id_map( SHB_Bookings::get_boat_types() );
+		$slot_map  = $this->id_map( SHB_Bookings::get_timeslots() );
 		$blocks    = SHB_Bookings::get_blocks_between( $first, $last );
 		$all_rows  = SHB_Bookings::get_blocks();
 
@@ -659,12 +707,13 @@ class SHB_Admin {
 		// Maandnavigatie.
 		$prev_ym = gmdate( 'Y-m', mktime( 12, 0, 0, $month - 1, 1, $year ) );
 		$next_ym = gmdate( 'Y-m', mktime( 12, 0, 0, $month + 1, 1, $year ) );
-		$nav_url = function ( $to_ym, $to_boat ) {
+		$nav_url = function ( $to_ym, $to_boat, $to_slot ) {
 			return add_query_arg(
 				array(
 					'page' => 'shb-availability',
 					'boat' => (int) $to_boat,
 					'ym'   => $to_ym,
+					'slot' => (int) $to_slot,
 				),
 				admin_url( 'admin.php' )
 			);
@@ -676,19 +725,30 @@ class SHB_Admin {
 		<div class="wrap shb-avail-wrap">
 			<h1><?php esc_html_e( 'Beschikbaarheid', 'sloephuren-booking' ); ?></h1>
 			<?php $this->notice(); ?>
-			<p><?php esc_html_e( 'Tik op een dag om die te blokkeren voor verhuur, of tik nogmaals om de dag weer vrij te geven. Kies eerst voor welke sloep het geldt.', 'sloephuren-booking' ); ?></p>
+			<p><?php esc_html_e( 'Kies voor welke sloep en welk dagdeel het geldt, en tik dan op een dag om die te blokkeren voor verhuur. Nogmaals tikken geeft de dag weer vrij.', 'sloephuren-booking' ); ?></p>
 
 			<div class="shb-chips">
-				<a class="shb-chip <?php echo 0 === $boat_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, 0 ) ); ?>"><?php esc_html_e( 'Alle sloepen', 'sloephuren-booking' ); ?></a>
+				<a class="shb-chip <?php echo 0 === $boat_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, 0, $slot_scope ) ); ?>"><?php esc_html_e( 'Alle sloepen', 'sloephuren-booking' ); ?></a>
 				<?php foreach ( $boats as $b ) : ?>
-					<a class="shb-chip <?php echo (int) $b->id === $boat_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, $b->id ) ); ?>"><?php echo esc_html( $b->name ); ?></a>
+					<a class="shb-chip <?php echo (int) $b->id === $boat_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, $b->id, $slot_scope ) ); ?>"><?php echo esc_html( $b->name ); ?></a>
 				<?php endforeach; ?>
 			</div>
 
+			<?php if ( $dayparts ) : ?>
+				<div class="shb-chips shb-chips-slot">
+					<a class="shb-chip <?php echo 0 === $slot_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, $boat_scope, 0 ) ); ?>"><?php esc_html_e( 'Hele dag', 'sloephuren-booking' ); ?></a>
+					<?php foreach ( $dayparts as $dp ) : ?>
+						<a class="shb-chip <?php echo $dp['id'] === $slot_scope ? 'active' : ''; ?>" href="<?php echo esc_url( $nav_url( $ym, $boat_scope, $dp['id'] ) ); ?>">
+							<?php echo esc_html( $dp['label'] . ' (' . substr( $dp['start'], 0, 5 ) . ' - ' . substr( $dp['end'], 0, 5 ) . ')' ); ?>
+						</a>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>
+
 			<div class="shb-avail-head">
-				<a class="button" href="<?php echo esc_url( $nav_url( $prev_ym, $boat_scope ) ); ?>">&lsaquo;</a>
+				<a class="button" href="<?php echo esc_url( $nav_url( $prev_ym, $boat_scope, $slot_scope ) ); ?>">&lsaquo;</a>
 				<strong><?php echo esc_html( $months_nl[ $month ] . ' ' . $year ); ?></strong>
-				<a class="button" href="<?php echo esc_url( $nav_url( $next_ym, $boat_scope ) ); ?>">&rsaquo;</a>
+				<a class="button" href="<?php echo esc_url( $nav_url( $next_ym, $boat_scope, $slot_scope ) ); ?>">&rsaquo;</a>
 			</div>
 
 			<div class="shb-avail-grid">
@@ -704,24 +764,44 @@ class SHB_Admin {
 				for ( $d = 1; $d <= $dim; $d++ ) :
 					$date = sprintf( '%04d-%02d-%02d', $year, $month, $d );
 
-					// Blokkade-status voor de gekozen scope bepalen.
-					$fully  = false;
-					$partly = false;
+					// Blokkade-status voor de gekozen sloep-scope bepalen.
+					$whole_day = false;
+					$partly    = false; // Alleen in Alle-weergave: sloep-specifieke blokkade.
+					$day_slots = array(); // Geblokkeerde dagdeel-tijdvakken (scope-passend).
 					foreach ( $blocks as $bl ) {
 						if ( $bl->date_from > $date || $bl->date_to < $date ) {
 							continue;
 						}
-						$bl_boat = (int) $bl->boat_type_id;
-						if ( 0 === $boat_scope ) {
-							if ( 0 === $bl_boat ) {
-								$fully = true;
-							} else {
-								$partly = true;
-							}
-						} elseif ( 0 === $bl_boat || $bl_boat === $boat_scope ) {
-							$fully = true;
+						$bl_boat     = (int) $bl->boat_type_id;
+						$scope_match = ( 0 === $boat_scope ) ? ( 0 === $bl_boat ) : ( 0 === $bl_boat || $bl_boat === $boat_scope );
+						if ( ! $scope_match ) {
+							$partly = true;
+							continue;
+						}
+						$bl_slot = (int) $bl->timeslot_id;
+						if ( 0 === $bl_slot ) {
+							$whole_day = true;
+						} elseif ( isset( $times[ $bl_slot ] ) ) {
+							$day_slots[] = $times[ $bl_slot ];
 						}
 					}
+
+					// Welke dagdelen zijn geraakt (via tijd-overlap)?
+					$blocked_parts = array();
+					if ( ! $whole_day && $day_slots && $dayparts ) {
+						foreach ( $dayparts as $dp ) {
+							foreach ( $day_slots as $bs ) {
+								if ( $dp['start'] < $bs[1] && $bs[0] < $dp['end'] ) {
+									$blocked_parts[] = $dp;
+									break;
+								}
+							}
+						}
+					}
+
+					$fully   = $whole_day || ( $dayparts && count( $blocked_parts ) === count( $dayparts ) ) || ( ! $dayparts && $day_slots );
+					$partday = ! $fully && $blocked_parts;
+					$letters = $partday ? implode( '·', array_map( function ( $dp ) { return strtoupper( mb_substr( $dp['label'], 0, 1 ) ); }, $blocked_parts ) ) : '';
 
 					$count = isset( $booked_count[ $date ] ) ? $booked_count[ $date ] : 0;
 
@@ -730,20 +810,23 @@ class SHB_Admin {
 						<div class="shb-avail-day is-past"><?php echo esc_html( $d ); ?></div>
 						<?php
 					else :
-						$classes = 'shb-avail-btn' . ( $fully ? ' is-blocked' : ( $partly ? ' is-partly' : '' ) );
+						$classes = 'shb-avail-btn' . ( $fully ? ' is-blocked' : ( $partday ? ' is-partday' : ( $partly ? ' is-partly' : '' ) ) );
 						$title   = $fully
-							? __( 'Tik om deze dag weer vrij te geven', 'sloephuren-booking' )
-							: __( 'Tik om deze dag te blokkeren', 'sloephuren-booking' );
+							? __( 'Geblokkeerd. Tik om vrij te geven (in de gekozen dagdeel-stand).', 'sloephuren-booking' )
+							: __( 'Tik om te blokkeren voor het gekozen dagdeel.', 'sloephuren-booking' );
 						?>
 						<form method="post">
 							<?php wp_nonce_field( 'shb_toggle_block_day' ); ?>
 							<input type="hidden" name="shb_action" value="toggle_block_day">
 							<input type="hidden" name="date" value="<?php echo esc_attr( $date ); ?>">
 							<input type="hidden" name="boat" value="<?php echo esc_attr( $boat_scope ); ?>">
+							<input type="hidden" name="slot" value="<?php echo esc_attr( $slot_scope ); ?>">
 							<input type="hidden" name="ym" value="<?php echo esc_attr( $ym ); ?>">
 							<button type="submit" class="<?php echo esc_attr( $classes ); ?>" title="<?php echo esc_attr( $title ); ?>">
 								<span><?php echo esc_html( $d ); ?></span>
-								<?php if ( $count ) : ?>
+								<?php if ( $letters ) : ?>
+									<span class="shb-partmark"><?php echo esc_html( $letters ); ?></span>
+								<?php elseif ( $count ) : ?>
 									<span class="shb-bkcount"><?php echo esc_html( $count ); ?></span>
 								<?php endif; ?>
 							</button>
@@ -755,9 +838,12 @@ class SHB_Admin {
 			</div>
 
 			<div class="shb-avail-legend">
-				<span><span class="shb-dot blocked"></span> <?php esc_html_e( 'Geblokkeerd', 'sloephuren-booking' ); ?></span>
+				<span><span class="shb-dot blocked"></span> <?php esc_html_e( 'Hele dag geblokkeerd', 'sloephuren-booking' ); ?></span>
+				<?php if ( $dayparts ) : ?>
+					<span><span class="shb-dot partday"></span> <?php esc_html_e( 'Dagdeel geblokkeerd (letter toont welk)', 'sloephuren-booking' ); ?></span>
+				<?php endif; ?>
 				<?php if ( 0 === $boat_scope ) : ?>
-					<span><span class="shb-dot partly"></span> <?php esc_html_e( 'Deels geblokkeerd (specifieke sloep)', 'sloephuren-booking' ); ?></span>
+					<span><span class="shb-dot partly"></span> <?php esc_html_e( 'Alleen specifieke sloep geblokkeerd', 'sloephuren-booking' ); ?></span>
 				<?php endif; ?>
 				<span><span class="shb-bkcount">2</span> <?php esc_html_e( 'Aantal betaalde boekingen', 'sloephuren-booking' ); ?></span>
 			</div>
@@ -776,6 +862,15 @@ class SHB_Admin {
 						<option value="<?php echo esc_attr( $b->id ); ?>" <?php selected( $boat_scope, (int) $b->id ); ?>><?php echo esc_html( $b->name ); ?></option>
 					<?php endforeach; ?>
 				</select>
+				<?php if ( $dayparts ) : ?>
+					<label><?php esc_html_e( 'Dagdeel', 'sloephuren-booking' ); ?></label>
+					<select name="timeslot_id">
+						<option value="0"><?php esc_html_e( 'Hele dag', 'sloephuren-booking' ); ?></option>
+						<?php foreach ( $dayparts as $dp ) : ?>
+							<option value="<?php echo esc_attr( $dp['id'] ); ?>" <?php selected( $slot_scope, $dp['id'] ); ?>><?php echo esc_html( $dp['label'] . ' (' . substr( $dp['start'], 0, 5 ) . ' - ' . substr( $dp['end'], 0, 5 ) . ')' ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				<?php endif; ?>
 				<label><?php esc_html_e( 'Van', 'sloephuren-booking' ); ?></label>
 				<input type="date" name="date_from" required>
 				<label><?php esc_html_e( 'Tot en met', 'sloephuren-booking' ); ?></label>
@@ -790,12 +885,13 @@ class SHB_Admin {
 				<thead><tr>
 					<th><?php esc_html_e( 'Periode', 'sloephuren-booking' ); ?></th>
 					<th><?php esc_html_e( 'Sloep', 'sloephuren-booking' ); ?></th>
+					<th><?php esc_html_e( 'Dagdeel', 'sloephuren-booking' ); ?></th>
 					<th><?php esc_html_e( 'Notitie', 'sloephuren-booking' ); ?></th>
 					<th style="width:110px;"><?php esc_html_e( 'Actie', 'sloephuren-booking' ); ?></th>
 				</tr></thead>
 				<tbody>
 				<?php if ( empty( $all_rows ) ) : ?>
-					<tr><td colspan="4"><?php esc_html_e( 'Nog geen blokkades. Alle dagen zijn boekbaar.', 'sloephuren-booking' ); ?></td></tr>
+					<tr><td colspan="5"><?php esc_html_e( 'Nog geen blokkades. Alle dagen zijn boekbaar.', 'sloephuren-booking' ); ?></td></tr>
 				<?php else : ?>
 					<?php foreach ( $all_rows as $bl ) : ?>
 						<tr>
@@ -807,6 +903,19 @@ class SHB_Admin {
 								?>
 							</td>
 							<td><?php echo esc_html( (int) $bl->boat_type_id ? ( isset( $boat_map[ (int) $bl->boat_type_id ] ) ? $boat_map[ (int) $bl->boat_type_id ]->name : '#' . (int) $bl->boat_type_id ) : __( 'Alle sloepen', 'sloephuren-booking' ) ); ?></td>
+							<td>
+								<?php
+								$bl_slot = (int) $bl->timeslot_id;
+								if ( 0 === $bl_slot ) {
+									esc_html_e( 'Hele dag', 'sloephuren-booking' );
+								} elseif ( isset( $slot_map[ $bl_slot ] ) ) {
+									$s = $slot_map[ $bl_slot ];
+									echo esc_html( preg_replace( '/\s*\(.*\)\s*$/', '', $s->label ) . ' (' . substr( $s->start_time, 0, 5 ) . ' - ' . substr( $s->end_time, 0, 5 ) . ')' );
+								} else {
+									echo esc_html( '#' . $bl_slot );
+								}
+								?>
+							</td>
 							<td><?php echo esc_html( $bl->note ); ?></td>
 							<td>
 								<form method="post" class="shb-inline-form">
@@ -814,6 +923,7 @@ class SHB_Admin {
 									<input type="hidden" name="shb_action" value="delete_block">
 									<input type="hidden" name="id" value="<?php echo esc_attr( $bl->id ); ?>">
 									<input type="hidden" name="boat" value="<?php echo esc_attr( $boat_scope ); ?>">
+									<input type="hidden" name="slot" value="<?php echo esc_attr( $slot_scope ); ?>">
 									<input type="hidden" name="ym" value="<?php echo esc_attr( $ym ); ?>">
 									<button class="button button-small button-link-delete"><?php esc_html_e( 'Verwijder', 'sloephuren-booking' ); ?></button>
 								</form>
