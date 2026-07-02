@@ -67,6 +67,7 @@ class SHB_Admin {
 		add_submenu_page( 'shb-bookings', __( 'Sloep-types', 'sloephuren-booking' ), __( 'Sloep-types', 'sloephuren-booking' ), self::CAP, 'shb-boat-types', array( $this, 'page_boat_types' ) );
 		add_submenu_page( 'shb-bookings', __( 'Pakketten', 'sloephuren-booking' ), __( 'Pakketten', 'sloephuren-booking' ), self::CAP, 'shb-products', array( $this, 'page_products' ) );
 		add_submenu_page( 'shb-bookings', __( 'Tijdsloten', 'sloephuren-booking' ), __( 'Tijdsloten', 'sloephuren-booking' ), self::CAP, 'shb-timeslots', array( $this, 'page_timeslots' ) );
+		add_submenu_page( 'shb-bookings', __( 'Shortcodes', 'sloephuren-booking' ), __( 'Shortcodes', 'sloephuren-booking' ), self::CAP, 'shb-shortcodes', array( $this, 'page_shortcodes' ) );
 		add_submenu_page( 'shb-bookings', __( 'Instellingen', 'sloephuren-booking' ), __( 'Instellingen', 'sloephuren-booking' ), self::CAP, 'shb-settings', array( $this, 'page_settings' ) );
 	}
 
@@ -1131,6 +1132,93 @@ class SHB_Admin {
 	/* --------------------------------------------------------------------- */
 	/* Scherm: Instellingen                                                  */
 	/* --------------------------------------------------------------------- */
+
+	/**
+	 * Shortcode-overzicht: kopieerbare codes met uitleg.
+	 */
+	public function page_shortcodes() {
+		// Voorbeeld-sloepnaam voor in de codes.
+		$boats  = SHB_Bookings::get_boat_types( true );
+		$sample = $boats ? $boats[0]->name : 'Stout 650';
+
+		$groups = array(
+			array(
+				'title' => __( 'De boek-widget plaatsen', 'sloephuren-booking' ),
+				'items' => array(
+					array(
+						'code' => '[sloephuren_booking]',
+						'desc' => __( 'Zet de zwevende boek-widget (launcher rechtsonder) op deze pagina. Niet nodig als "Widget overal tonen" aanstaat bij Instellingen; dan staat de widget al op elke pagina.', 'sloephuren-booking' ),
+					),
+					array(
+						'code' => '[sloephuren_booking sloep="' . $sample . '"]',
+						'desc' => __( 'Zelfde widget, maar gekoppeld aan één sloep: stap 1 (sloep kiezen) valt weg en de titel wordt "{sloep} boeken". Zet dit op een sloep-detailpagina.', 'sloephuren-booking' ),
+					),
+				),
+			),
+			array(
+				'title' => __( 'Op je eigen knoppen en links: de widget openen', 'sloephuren-booking' ),
+				'items' => array(
+					array(
+						'code' => '[sloephuren_open]Boek je sloep[/sloephuren_open]',
+						'desc' => __( 'Maakt van de tekst een link die de widget opent. Zet dit in een tekst- of knop-element. De tekst tussen de tags mag je vrij aanpassen.', 'sloephuren-booking' ),
+					),
+					array(
+						'code' => '[sloephuren_open sloep="' . $sample . '"]Boek de ' . $sample . '[/sloephuren_open]',
+						'desc' => __( 'Zelfde openings-link, maar selecteert die sloep alvast voor (de widget springt door naar de pakket-stap).', 'sloephuren-booking' ),
+					),
+				),
+			),
+		);
+		?>
+		<div class="wrap shb-admin-form">
+			<h1><?php esc_html_e( 'Shortcodes', 'sloephuren-booking' ); ?></h1>
+			<p><?php esc_html_e( 'Kopieer een shortcode en plak die in een pagina, tekstblok of knop. Klik op "Kopieer" om de code naar je klembord te kopiëren.', 'sloephuren-booking' ); ?></p>
+
+			<?php foreach ( $groups as $group ) : ?>
+				<h2><?php echo esc_html( $group['title'] ); ?></h2>
+				<table class="wp-list-table widefat striped" style="max-width:820px;margin-bottom:22px;">
+					<tbody>
+					<?php foreach ( $group['items'] as $item ) : ?>
+						<tr>
+							<td style="width:52%;vertical-align:top;padding:12px;">
+								<input type="text" readonly value="<?php echo esc_attr( $item['code'] ); ?>" class="shb-sc-code" style="width:100%;font-family:monospace;padding:8px 10px;background:#f6f7f7;border:1px solid #dcdcde;border-radius:6px;" onclick="this.select();">
+								<button type="button" class="button button-small shb-sc-copy" style="margin-top:8px;"><?php esc_html_e( 'Kopieer', 'sloephuren-booking' ); ?></button>
+							</td>
+							<td style="vertical-align:top;padding:12px;color:#50575e;"><?php echo esc_html( $item['desc'] ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endforeach; ?>
+
+			<h2><?php esc_html_e( 'Zonder shortcode: bestaande knoppen (bijv. Elementor)', 'sloephuren-booking' ); ?></h2>
+			<p style="max-width:820px;color:#50575e;">
+				<?php esc_html_e( 'Kun je op een knop geen shortcode kwijt (zoals bij een Elementor-knop), gebruik dan een van deze twee opties:', 'sloephuren-booking' ); ?>
+			</p>
+			<ul style="max-width:820px;list-style:disc;margin-left:20px;color:#50575e;">
+				<li><?php printf( wp_kses( __( 'Zet de <strong>link</strong> van de knop op <code>#sloephuren</code>. Klikken opent de widget.', 'sloephuren-booking' ), array( 'strong' => array(), 'code' => array() ) ) ); ?></li>
+				<li><?php printf( wp_kses( __( 'Of geef de knop de <strong>CSS-class</strong> <code>shb-open</code> (in Elementor onder Geavanceerd &rarr; CSS-classes). Voeg eventueel <code>data-shb-sloep="%s"</code> toe als HTML-attribuut om die sloep voor te selecteren.', 'sloephuren-booking' ), array( 'strong' => array(), 'code' => array() ) ), esc_html( $sample ) ); ?></li>
+			</ul>
+			<p style="max-width:820px;color:#50575e;">
+				<?php esc_html_e( 'Let op: de widget-scripts moeten op de pagina staan. Met "Widget overal tonen" aan (standaard) is dat altijd het geval. Staat dat uit, plaats dan ook ergens op de pagina een van de shortcodes hierboven.', 'sloephuren-booking' ); ?>
+			</p>
+
+			<script>
+			( function () {
+				document.querySelectorAll( '.shb-sc-copy' ).forEach( function ( btn ) {
+					btn.addEventListener( 'click', function () {
+						var input = btn.parentNode.querySelector( '.shb-sc-code' );
+						input.select();
+						var done = function () { var t = btn.textContent; btn.textContent = '<?php echo esc_js( __( 'Gekopieerd!', 'sloephuren-booking' ) ); ?>'; setTimeout( function () { btn.textContent = t; }, 1500 ); };
+						if ( navigator.clipboard ) { navigator.clipboard.writeText( input.value ).then( done, function () { document.execCommand( 'copy' ); done(); } ); }
+						else { document.execCommand( 'copy' ); done(); }
+					} );
+				} );
+			} )();
+			</script>
+		</div>
+		<?php
+	}
 
 	/**
 	 * Instellingenscherm.

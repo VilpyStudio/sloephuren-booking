@@ -687,6 +687,38 @@
 		}
 	}
 
+	/* ----------------------------------------------------------------- */
+	/* Open-triggers (shortcode, CSS-class en hash-link)                  */
+	/* ----------------------------------------------------------------- */
+
+	// Widget openen, optioneel met een voorgeselecteerde sloep (op naam).
+	function openWidget( sloepName ) {
+		if ( sloepName ) {
+			var b = BOATS.filter( function ( x ) { return x.name.toLowerCase() === String( sloepName ).toLowerCase(); } )[ 0 ];
+			if ( b ) {
+				state.sloep = b.id;
+				if ( state.step < 2 ) { state.step = 2; }
+			}
+		}
+		setState( { open: true } );
+	}
+	// Publiek beschikbaar zodat ook onclick="shbOpenWidget()" kan.
+	window.shbOpenWidget = openWidget;
+
+	// Klik op een element met class shb-open of een link naar #sloephuren.
+	document.addEventListener( 'click', function ( e ) {
+		if ( ! e.target || ! e.target.closest ) { return; }
+		var t = e.target.closest( '.shb-open, a[href$="#sloephuren"], a[href$="#boek-sloep"]' );
+		if ( ! t ) { return; }
+		e.preventDefault();
+		openWidget( t.getAttribute( 'data-shb-sloep' ) );
+	} );
+
+	// Direct openen wanneer de pagina met #sloephuren wordt geladen.
+	if ( window.location.hash === '#sloephuren' || window.location.hash === '#boek-sloep' ) {
+		state.open = true;
+	}
+
 	// Mobiel/desktop wisselen.
 	window.matchMedia( '(max-width: 640px)' ).addEventListener( 'change', function ( e ) {
 		setState( { isMobile: e.matches } );

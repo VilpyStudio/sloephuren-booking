@@ -44,6 +44,7 @@ class SHB_Plugin {
 	protected function __construct() {
 		// Frontend.
 		add_shortcode( 'sloephuren_booking', array( $this, 'render_shortcode' ) );
+		add_shortcode( 'sloephuren_open', array( $this, 'render_open_shortcode' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
 		// Widget overal op de site tonen (indien ingeschakeld).
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_sitewide' ), 20 );
@@ -127,6 +128,44 @@ class SHB_Plugin {
 
 		// De widget (launcher + paneel) wordt door JS aan <body> gehangen.
 		return '<div class="shb-widget-anchor" aria-hidden="true" style="display:none"></div>';
+	}
+
+	/**
+	 * Shortcode [sloephuren_open]...[/sloephuren_open]: maakt van de inhoud een
+	 * link die de boek-widget opent. Handig om op een bestaande knop/link te
+	 * plaatsen. Optioneel sloep="Stout 650" om die sloep voor te selecteren.
+	 *
+	 * @param array       $atts    Attributen.
+	 * @param string|null $content Inhoud tussen de tags (linktekst).
+	 * @return string
+	 */
+	public function render_open_shortcode( $atts, $content = null ) {
+		$atts = shortcode_atts(
+			array(
+				'sloep' => '',
+				'class' => '',
+				'text'  => '',
+			),
+			$atts,
+			'sloephuren_open'
+		);
+
+		// Zorg dat de widget op deze pagina bestaat.
+		$this->enqueue_widget();
+
+		$label = '' !== trim( (string) $content ) ? $content : $atts['text'];
+		if ( '' === trim( (string) $label ) ) {
+			$label = __( 'Boek je sloep', 'sloephuren-booking' );
+		}
+
+		$classes = trim( 'shb-open ' . sanitize_text_field( $atts['class'] ) );
+
+		return sprintf(
+			'<a href="#sloephuren" class="%1$s"%2$s>%3$s</a>',
+			esc_attr( $classes ),
+			$atts['sloep'] ? ' data-shb-sloep="' . esc_attr( sanitize_text_field( $atts['sloep'] ) ) . '"' : '',
+			do_shortcode( wp_kses_post( $label ) )
+		);
 	}
 
 	/**

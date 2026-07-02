@@ -3,6 +3,13 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.4.0] - 2026-07-02
+
+### Added
+- Trigger-shortcode `[sloephuren_open]tekst[/sloephuren_open]` om de widget te openen vanaf je eigen knop of link (optioneel `sloep="..."` om die sloep voor te selecteren).
+- Openen kan ook zonder shortcode: een link naar `#sloephuren` of een element met de CSS-class `shb-open` (met optioneel `data-shb-sloep`). Globale functie `window.shbOpenWidget(sloepnaam)` beschikbaar.
+- Admin-scherm **Shortcodes**: overzicht van alle shortcodes met uitleg en kopieer-knoppen, plus tips voor Elementor-knoppen.
+
 ## [2.3.0] - 2026-07-02
 
 ### Added

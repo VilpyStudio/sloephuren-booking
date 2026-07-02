@@ -22,6 +22,15 @@ Installeer via de zip uit de [GitHub Releases](https://github.com/VilpyStudio/sl
    [sloephuren_booking auto_advance="0"]      niet automatisch doorgaan na een keuze
    ```
 
+   Openen vanaf een eigen knop/link:
+
+   ```
+   [sloephuren_open]Boek je sloep[/sloephuren_open]              link die de widget opent
+   [sloephuren_open sloep="Stout 650"]Boek de Stout 650[/sloephuren_open]
+   ```
+
+   Zonder shortcode (bijv. Elementor-knop): zet de link op `#sloephuren`, of geef de knop de CSS-class `shb-open`. Een volledig overzicht met kopieerbare codes staat onder **Sloephuren → Shortcodes**.
+
 ## Standaarddata
 
 **Sloep-types**
