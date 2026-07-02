@@ -56,28 +56,40 @@ class SHB_Emails {
 	 */
 	protected static function details_table( $d ) {
 		$rows = array(
-			__( 'Boekingsnummer', 'sloephuren-booking' ) => $d['number'],
-			__( 'Datum', 'sloephuren-booking' )          => $d['date'],
-			__( 'Tijd', 'sloephuren-booking' )           => $d['time'],
-			__( 'Pakket', 'sloephuren-booking' )         => $d['package'],
-			__( 'Sloep', 'sloephuren-booking' )          => $d['boat'],
-			__( 'Aantal personen', 'sloephuren-booking' ) => $d['persons'],
-			__( 'Betaald bedrag', 'sloephuren-booking' ) => '&euro; ' . $d['amount'],
+			array( __( 'Boekingsnummer', 'sloephuren-booking' ), $d['number'], false ),
+			array( __( 'Datum', 'sloephuren-booking' ), $d['date'], false ),
+			array( __( 'Tijd', 'sloephuren-booking' ), $d['time'], false ),
+			array( __( 'Pakket', 'sloephuren-booking' ), $d['package'], false ),
+			array( __( 'Sloep', 'sloephuren-booking' ), $d['boat'], false ),
+			array( __( 'Aantal personen', 'sloephuren-booking' ), $d['persons'], false ),
+			array( __( 'Betaald bedrag', 'sloephuren-booking' ), '&euro; ' . $d['amount'], true ),
 		);
 
-		$html = '<table cellpadding="8" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;max-width:520px;">';
-		$i    = 0;
-		foreach ( $rows as $label => $value ) {
-			$bg    = ( 0 === $i % 2 ) ? '#f4f1ea' : '#ffffff';
-			$html .= '<tr style="background:' . esc_attr( $bg ) . ';">';
-			$html .= '<td style="font-weight:600;color:#12324a;border-bottom:1px solid #e5ded0;">' . esc_html( $label ) . '</td>';
-			$html .= '<td style="color:#333;border-bottom:1px solid #e5ded0;">' . esc_html( $value ) . '</td>';
-			$html .= '</tr>';
-			$i++;
+		$html  = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:8px 0;">';
+		$total = count( $rows );
+		foreach ( $rows as $i => $row ) {
+			list( $label, $value, $strong ) = $row;
+			$border = ( $i < $total - 1 ) ? 'border-bottom:1px solid #ece6da;' : '';
+			$vstyle = $strong
+				? 'font-family:Arial,Helvetica,sans-serif;font-size:17px;font-weight:700;color:#15324F;'
+				: 'font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#3C4B55;';
+			$html  .= '<tr>';
+			$html  .= '<td style="padding:11px 0;' . $border . 'font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#8a8072;vertical-align:top;">' . esc_html( $label ) . '</td>';
+			$html  .= '<td style="padding:11px 0;' . $border . $vstyle . 'text-align:right;vertical-align:top;">' . wp_kses( $value, array() ) . '</td>';
+			$html  .= '</tr>';
 		}
 		$html .= '</table>';
 
 		return $html;
+	}
+
+	/**
+	 * URL van het lichte logo (voor op de marine header).
+	 *
+	 * @return string
+	 */
+	protected static function logo_url() {
+		return SHB_PLUGIN_URL . 'public/img/logo-light.png';
 	}
 
 	/**
@@ -88,18 +100,65 @@ class SHB_Emails {
 	 * @return string
 	 */
 	protected static function wrap( $title, $body ) {
-		$site = get_bloginfo( 'name' );
-		$html = '<div style="font-family:Arial,Helvetica,sans-serif;background:#eef3f6;padding:24px;">';
-		$html .= '<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;">';
-		$html .= '<div style="background:#12324a;padding:24px 28px;">';
-		$html .= '<h1 style="margin:0;color:#ffffff;font-size:22px;">' . esc_html( $title ) . '</h1>';
-		$html .= '<p style="margin:4px 0 0;color:#9fc0d6;font-size:14px;">' . esc_html( $site ) . '</p>';
-		$html .= '</div>';
-		$html .= '<div style="padding:28px;color:#333;font-size:15px;line-height:1.6;">' . $body . '</div>';
-		$html .= '<div style="padding:18px 28px;background:#f4f1ea;color:#777;font-size:12px;">';
-		$html .= esc_html( sprintf( /* translators: %s: sitenaam */ __( 'Deze e-mail is automatisch verstuurd door %s.', 'sloephuren-booking' ), $site ) );
-		$html .= '</div></div></div>';
-		return $html;
+		$site   = get_bloginfo( 'name' );
+		$logo   = esc_url( self::logo_url() );
+		$footer = sprintf(
+			/* translators: %s: sitenaam */
+			__( 'Deze e-mail is automatisch verstuurd door %s.', 'sloephuren-booking' ),
+			$site
+		);
+
+		ob_start();
+		?><!DOCTYPE html>
+<html lang="nl" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="x-apple-disable-message-reformatting">
+	<meta name="color-scheme" content="light">
+	<meta name="supported-color-schemes" content="light">
+	<title><?php echo esc_html( $title ); ?></title>
+	<style>
+		/* Mobiel: kleinere padding, geen ronde hoeken op de rand. */
+		@media only screen and (max-width:600px) {
+			.shb-card { border-radius: 0 !important; }
+			.shb-pad { padding: 22px 20px !important; }
+			.shb-head { padding: 20px 20px !important; }
+		}
+		/* Voorkom dat clients de mail donker inverteren. */
+		:root { color-scheme: light; supported-color-schemes: light; }
+	</style>
+</head>
+<body style="margin:0;padding:0;background:#eef3f6;-webkit-text-size-adjust:100%;">
+	<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef3f6;">
+		<tr>
+			<td align="center" style="padding:24px 12px;">
+				<table role="presentation" class="shb-card" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;">
+					<tr>
+						<td class="shb-head" style="background:#15324F;padding:24px 30px;">
+							<img src="<?php echo $logo; // phpcs:ignore WordPress.Security.EscapeOutput ?>" alt="<?php echo esc_attr( $site ); ?>" height="42" style="height:42px;width:auto;display:block;border:0;margin-bottom:12px;">
+							<div style="font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:700;color:#ffffff;line-height:1.2;"><?php echo esc_html( $title ); ?></div>
+							<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#9DB4C3;margin-top:3px;"><?php echo esc_html( $site ); ?></div>
+						</td>
+					</tr>
+					<tr>
+						<td class="shb-pad" style="padding:28px 30px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#3C4B55;">
+							<?php echo $body; // phpcs:ignore WordPress.Security.EscapeOutput ?>
+						</td>
+					</tr>
+					<tr>
+						<td style="padding:16px 30px;background:#F2EBE0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8a8072;">
+							<?php echo esc_html( $footer ); ?>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>
+		<?php
+		return ob_get_clean();
 	}
 
 	/**
