@@ -221,7 +221,7 @@ class SHB_Plugin {
 				'boats'       => $boats,
 				'return'      => esc_url_raw( $this->current_url() ),
 				'terms'       => esc_url_raw( get_option( 'shb_terms_url', '' ) ),
-				'logo'        => esc_url_raw( SHB_PLUGIN_URL . 'public/img/logo.png' ),
+				'logo'        => esc_url_raw( SHB_PLUGIN_URL . 'public/img/logo-mark.png?v=' . SHB_VERSION ),
 				'fixedSloep'  => sanitize_text_field( $atts['sloep'] ),
 				'startOpen'   => ( '1' === (string) $atts['start_open'] || 'true' === $atts['start_open'] ),
 				'autoAdvance' => ! ( '0' === (string) $atts['auto_advance'] || 'false' === $atts['auto_advance'] ),

@@ -3,7 +3,7 @@
  * Plugin Name:       Sloephuren Booking
  * Plugin URI:        https://sloepverhuurzaanstad.nl
  * Description:        Online sloepen boeken en direct afrekenen via iDEAL. Beschikbaarheidscontrole op datum, tijdslot en sloep-type zodat dubbele boekingen onmogelijk zijn.
- * Version:           2.4.1
+ * Version:           2.4.2
  * Author:            Studio Vilpy
  * Author URI:        https://vilpy.nl
  * License:           GPL-2.0-or-later
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Vaste plugin-constanten.
  */
-define( 'SHB_VERSION', '2.4.1' );
+define( 'SHB_VERSION', '2.4.2' );
 define( 'SHB_PLUGIN_FILE', __FILE__ );
 define( 'SHB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

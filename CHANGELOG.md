@@ -3,6 +3,16 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.4.2] - 2026-07-02
+
+### Fixed
+- Widget-logo netjes gemaakt: de slate achtergrond van het merk-badge botste met de crème cirkel. Nu een uitgeknipt mark (ingekleurde boot + woordmerk) op de ronde crème cirkel met een dunne witte ring. De mail-header houdt het lichte volledige logo.
+
+## [2.4.1] - 2026-07-02
+
+### Changed
+- Bevestigingsmail volledig herschreven: tabel-gebaseerd, mobiel-responsive, strakke padding, merkkleuren, logo in de header en een `color-scheme: light`-hint zodat mail-clients de mail niet donker inverteren.
+
 ## [2.4.0] - 2026-07-02
 
 ### Added
