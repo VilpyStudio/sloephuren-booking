@@ -572,7 +572,15 @@
 		var termsTxt = D.terms
 			? el( 'div', { 'class': 'shb-terms-txt', html: 'Ik ga akkoord met de <a href="' + D.terms + '" target="_blank" rel="noopener">voorwaarden</a>.' } )
 			: el( 'div', { 'class': 'shb-terms-txt', html: 'Ik ga akkoord met de <span class="shb-terms-link">voorwaarden</span>.' } );
-		wrap.appendChild( el( 'div', { 'class': 'shb-terms', onclick: function () { setState( { akkoord: ! state.akkoord } ); } }, [
+		wrap.appendChild( el( 'div', {
+			'class': 'shb-terms',
+			onclick: function ( e ) {
+				// Klik op de voorwaarden-link laten navigeren i.p.v. het vinkje togglen
+				// (togglen tekent de widget opnieuw, waardoor de link-navigatie verloren gaat).
+				if ( e.target && e.target.closest && e.target.closest( 'a' ) ) { return; }
+				setState( { akkoord: ! state.akkoord } );
+			}
+		}, [
 			el( 'div', { 'class': 'shb-checkbox' + ( state.akkoord ? ' is-checked' : '' ) + ( state.errors.akkoord ? ' is-error' : '' ), text: state.akkoord ? '✓' : '' } ),
 			termsTxt
 		] ) );

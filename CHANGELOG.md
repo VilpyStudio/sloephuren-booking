@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.4.3] - 2026-07-02
+
+### Fixed
+- Voorwaarden-link in stap 5 werkte niet: een klik op de link togglede het akkoord-vinkje en tekende de widget opnieuw, waardoor de navigatie verloren ging. Een klik op de link laat 'm nu gewoon openen (in een nieuw tabblad).
+
 ## [2.4.2] - 2026-07-02
 
 ### Fixed
