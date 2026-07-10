@@ -83,6 +83,23 @@ class SHB_Bookings {
 	}
 
 	/**
+	 * Sloep-type snel aan- of uitzetten (actief-vlag).
+	 *
+	 * @param int  $id     ID.
+	 * @param bool $active Nieuwe staat.
+	 */
+	public static function set_boat_type_active( $id, $active ) {
+		global $wpdb;
+		$wpdb->update(
+			SHB_Install::table( 'boat_types' ),
+			array( 'active' => $active ? 1 : 0 ),
+			array( 'id' => (int) $id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+	}
+
+	/**
 	 * Sloep-type verwijderen.
 	 *
 	 * @param int $id ID.

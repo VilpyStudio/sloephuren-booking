@@ -136,6 +136,9 @@ class SHB_Admin {
 			case 'save_boat_type':
 				$this->save_boat_type();
 				break;
+			case 'toggle_boat_active':
+				$this->toggle_boat_active();
+				break;
 			case 'delete_boat_type':
 				$this->delete_entity( 'boat_type', 'shb-boat-types' );
 				break;
@@ -206,6 +209,19 @@ class SHB_Admin {
 			$id
 		);
 		$this->redirect( 'shb-boat-types' );
+	}
+
+	/**
+	 * Sloep-type met één klik aan- of uitzetten (tijdelijk uit de verhuur).
+	 */
+	protected function toggle_boat_active() {
+		$this->check_nonce( 'shb_toggle_boat_active' );
+		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		$to = empty( $_POST['to'] ) ? 0 : 1;
+		if ( $id ) {
+			SHB_Bookings::set_boat_type_active( $id, $to );
+		}
+		$this->redirect( 'shb-boat-types', $to ? 'activated' : 'deactivated' );
 	}
 
 	/**
@@ -482,6 +498,8 @@ class SHB_Admin {
 			'saved'         => __( 'Opgeslagen.', 'sloephuren-booking' ),
 			'deleted'       => __( 'Verwijderd.', 'sloephuren-booking' ),
 			'updated'       => __( 'Bijgewerkt.', 'sloephuren-booking' ),
+			'activated'     => __( 'Sloep weer beschikbaar voor verhuur.', 'sloephuren-booking' ),
+			'deactivated'   => __( 'Sloep uitgezet: niet meer te boeken tot je hem weer aanzet.', 'sloephuren-booking' ),
 			'day_blocked'   => __( 'Dag geblokkeerd voor verhuur.', 'sloephuren-booking' ),
 			'day_unblocked' => __( 'Dag weer vrijgegeven voor verhuur.', 'sloephuren-booking' ),
 			'block_added'   => __( 'Periode geblokkeerd.', 'sloephuren-booking' ),
@@ -969,8 +987,25 @@ class SHB_Admin {
 						<td><strong><?php echo esc_html( $r->name ); ?></strong></td>
 						<td><?php echo esc_html( $r->stock ); ?></td>
 						<td><?php echo esc_html( $r->max_persons ); ?></td>
-						<td><?php echo $r->active ? '&#10003;' : '&mdash;'; ?></td>
 						<td>
+							<?php if ( $r->active ) : ?>
+								<span class="shb-status paid"><?php esc_html_e( 'Beschikbaar', 'sloephuren-booking' ); ?></span>
+							<?php else : ?>
+								<span class="shb-status failed"><?php esc_html_e( 'Uitgezet', 'sloephuren-booking' ); ?></span>
+							<?php endif; ?>
+						</td>
+						<td>
+							<form method="post" class="shb-inline-form">
+								<?php wp_nonce_field( 'shb_toggle_boat_active' ); ?>
+								<input type="hidden" name="shb_action" value="toggle_boat_active">
+								<input type="hidden" name="id" value="<?php echo esc_attr( $r->id ); ?>">
+								<input type="hidden" name="to" value="<?php echo $r->active ? '0' : '1'; ?>">
+								<?php if ( $r->active ) : ?>
+									<button class="button button-small" title="<?php esc_attr_e( 'Tijdelijk uit de verhuur halen', 'sloephuren-booking' ); ?>"><?php esc_html_e( 'Zet uit', 'sloephuren-booking' ); ?></button>
+								<?php else : ?>
+									<button class="button button-small button-primary"><?php esc_html_e( 'Zet aan', 'sloephuren-booking' ); ?></button>
+								<?php endif; ?>
+							</form>
 							<a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=shb-boat-types&edit=' . $r->id ) ); ?>"><?php esc_html_e( 'Bewerk', 'sloephuren-booking' ); ?></a>
 							<?php $this->delete_button( 'boat_type', $r->id ); ?>
 						</td>

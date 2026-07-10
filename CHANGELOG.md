@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.5.0] - 2026-07-02
+
+### Added
+- Sloep-types kun je nu met één klik **aan/uit** zetten in de lijst (Sloephuren → Sloep-types). Een uitgezette sloep verdwijnt direct uit de widget en is niet boekbaar, zonder dat je hem hoeft te verwijderen. Handig als een boot tijdelijk niet te huur is.
+
 ## [2.4.3] - 2026-07-02
 
 ### Fixed
