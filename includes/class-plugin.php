@@ -326,6 +326,17 @@ class SHB_Plugin {
 			)
 		);
 
+		// Boekingstatus opvragen (voor het terugkeer-scherm na de betaling).
+		register_rest_route(
+			self::REST_NS,
+			'/status',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'rest_status' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
 		// Boeking + betaling starten.
 		register_rest_route(
 			self::REST_NS,
@@ -416,6 +427,44 @@ class SHB_Plugin {
 
 		$unavailable = SHB_Availability::get_month_unavailable_days( $product_id, $year, $month, $boat_id );
 		return new WP_REST_Response( array( 'unavailable' => $unavailable ), 200 );
+	}
+
+	/**
+	 * REST: status van een boeking teruggeven (op boekingsnummer).
+	 *
+	 * Gebruikt door het terugkeer-scherm om de ECHTE betaalstatus te tonen,
+	 * onafhankelijk van eventuele URL-parameters. Geeft alleen niet-persoonlijke
+	 * samenvattingsvelden terug (geen naam/e-mail/telefoon).
+	 *
+	 * @param WP_REST_Request $request Verzoek.
+	 * @return WP_REST_Response
+	 */
+	public function rest_status( $request ) {
+		$number  = sanitize_text_field( (string) $request->get_param( 'number' ) );
+		$booking = $number ? SHB_Bookings::get_booking_by_number( $number ) : null;
+
+		if ( ! $booking ) {
+			return new WP_REST_Response( array( 'error' => __( 'Boeking niet gevonden.', 'sloephuren-booking' ) ), 404 );
+		}
+
+		$product  = SHB_Bookings::get_product( $booking->product_id );
+		$boat     = SHB_Bookings::get_boat_type( $booking->boat_type_id );
+		$timeslot = SHB_Bookings::get_timeslot( $booking->timeslot_id );
+
+		return new WP_REST_Response(
+			array(
+				'status'  => $booking->status,
+				'number'  => $booking->booking_number,
+				'amount'  => (float) $booking->amount,
+				'summary' => array(
+					array( 'label' => __( 'Sloep', 'sloephuren-booking' ), 'val' => $boat ? $boat->name : '' ),
+					array( 'label' => __( 'Pakket', 'sloephuren-booking' ), 'val' => $product ? $product->name : '' ),
+					array( 'label' => __( 'Datum', 'sloephuren-booking' ), 'val' => date_i18n( 'l j F Y', strtotime( $booking->booking_date ) ) ),
+					array( 'label' => __( 'Tijdslot', 'sloephuren-booking' ), 'val' => $timeslot ? $timeslot->label : '' ),
+				),
+			),
+			200
+		);
 	}
 
 	/**

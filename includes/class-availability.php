@@ -37,23 +37,41 @@ class SHB_Availability {
 		$minutes = (int) get_option( 'shb_pending_minutes', 15 );
 		$cutoff  = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( $minutes * MINUTE_IN_SECONDS ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
 
-		// Een plek is bezet wanneer:
-		// - de boeking betaald is, OF
-		// - de boeking pending is én nog niet verlopen (created_at >= cutoff).
-		$sql = "SELECT COUNT(*) FROM {$table}
+		// Een sloep is bezet zolang zijn boeking in TIJD overlapt met het gevraagde
+		// tijdslot, ook als het een ander pakket/tijdslot is. Een middag-boeking
+		// (14:30-18:30) bezet de sloep dus ook voor "hele dag" (10:00-18:00), maar
+		// niet voor de ochtend. We tellen daarom alle boekingen op de overlappende
+		// tijdsloten mee, niet alleen op exact hetzelfde tijdslot-ID.
+		$times = self::slot_times();
+		$req   = isset( $times[ (int) $timeslot_id ] ) ? $times[ (int) $timeslot_id ] : null;
+
+		$ids = array();
+		if ( $req ) {
+			foreach ( $times as $sid => $t ) {
+				if ( self::times_overlap( $req, $t ) ) {
+					$ids[] = (int) $sid;
+				}
+			}
+		}
+		if ( ! $ids ) {
+			$ids = array( (int) $timeslot_id ); // fallback: exact tijdslot.
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+		$sql          = "SELECT COUNT(*) FROM {$table}
 			WHERE booking_date = %s
-			  AND timeslot_id = %d
 			  AND boat_type_id = %d
+			  AND timeslot_id IN ({$placeholders})
 			  AND id <> %d
 			  AND (
 			      status = 'paid'
 			      OR ( status = 'pending_payment' AND created_at >= %s )
 			  )";
 
+		$params = array_merge( array( $date, $boat_type_id ), $ids, array( $exclude_id, $cutoff ) );
+
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		return (int) $wpdb->get_var(
-			$wpdb->prepare( $sql, $date, $timeslot_id, $boat_type_id, $exclude_id, $cutoff )
-		);
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $params ) );
 	}
 
 	/**
@@ -200,18 +218,29 @@ class SHB_Availability {
 		}
 
 		$blocks      = SHB_Bookings::get_blocks_between( $first, $last );
+		$all_times   = self::slot_times(); // Alle tijdsloten (ook van andere pakketten) voor de overlap-som.
 		$unavailable = array();
 
 		for ( $d = 1; $d <= $dim; $d++ ) {
 			$date = sprintf( '%04d-%02d-%02d', $year, $month, $d );
 			$free = false;
 			foreach ( $slots as $slot ) {
+				$slot_time = array( $slot->start_time, $slot->end_time );
 				foreach ( $boats as $bt ) {
 					if ( self::block_covers( $blocks, $date, (int) $slot->id, (int) $bt->id ) ) {
 						continue;
 					}
-					$key = $date . '|' . $slot->id . '|' . $bt->id;
-					$c   = isset( $taken[ $key ] ) ? $taken[ $key ] : 0;
+					// Overlap-bewust tellen: alle boekingen op tijdsloten die met dit
+					// tijdslot overlappen (ook van andere pakketten) bezetten de sloep.
+					$c = 0;
+					foreach ( $all_times as $sid => $t ) {
+						if ( self::times_overlap( $slot_time, $t ) ) {
+							$k = $date . '|' . $sid . '|' . $bt->id;
+							if ( isset( $taken[ $k ] ) ) {
+								$c += $taken[ $k ];
+							}
+						}
+					}
 					if ( ( (int) $bt->stock - $c ) > 0 ) {
 						$free = true;
 						break 2;
@@ -386,9 +415,11 @@ class SHB_Availability {
 		$timeslot_id  = (int) $data['timeslot_id'];
 		$boat_type_id = (int) $data['boat_type_id'];
 
-		// Unieke lock-naam per combinatie datum/tijdslot/sloep-type.
-		// (max 64 tekens voor GET_LOCK; hash houdt het kort en veilig.)
-		$lock_name = 'shb_' . md5( $date . '|' . $timeslot_id . '|' . $boat_type_id );
+		// Unieke lock-naam per combinatie datum/sloep-type. Bewust NIET per
+		// tijdslot: overlappende tijdsloten (bijv. middag en hele dag) moeten
+		// elkaar serialiseren, anders kunnen twee gelijktijdige aanvragen op
+		// verschillende-maar-overlappende sloten de sloep dubbel boeken.
+		$lock_name = 'shb_' . md5( $date . '|' . $boat_type_id );
 
 		// Lock verkrijgen (max 10 seconden wachten).
 		$got_lock = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_name, 10 ) );

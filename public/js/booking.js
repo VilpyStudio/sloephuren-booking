@@ -347,7 +347,7 @@
 		var p = product();
 
 		// Header.
-		var title = state.fase === 'success' ? 'Je boeking' : ( FIXED_BOAT ? FIXED_BOAT.name + ' boeken' : 'Boek je sloep' );
+		var title = ( ! isForm ) ? 'Je boeking' : ( FIXED_BOAT ? FIXED_BOAT.name + ' boeken' : 'Boek je sloep' );
 		panel.appendChild( el( 'div', { 'class': 'shb-panel-header' }, [
 			el( 'div', { 'class': 'shb-ph-left' }, [
 				el( 'img', { 'class': 'shb-ph-logo', src: D.logo, alt: '' } ),
@@ -384,7 +384,13 @@
 			if ( processing ) {
 				body.appendChild( el( 'div', { 'class': 'shb-processing-note', text: 'Je wordt doorgestuurd naar iDEAL om de betaling af te ronden.' } ) );
 			}
-		} else if ( state.fase === 'success' || state.fase === 'failed' ) {
+		} else if ( state.fase === 'checking' ) {
+			body.appendChild( el( 'div', { 'class': 'shb-step', style: 'text-align:center;padding:24px 8px' }, [
+				el( 'div', { 'class': 'shb-checking-spin' } ),
+				el( 'div', { 'class': 'shb-title', style: 'margin-top:16px', text: 'Je betaling wordt gecontroleerd...' } ),
+				el( 'div', { 'class': 'shb-result-text', text: 'Een moment geduld, we bevestigen je boeking.' } )
+			] ) );
+		} else {
 			body.appendChild( renderResult() );
 		}
 
@@ -621,11 +627,16 @@
 	function renderResult() {
 		var wrap = el( 'div', { 'class': 'shb-step', style: 'display:flex;flex-direction:column;gap:14px' } );
 		var success = state.fase === 'success';
+		var pending = state.fase === 'pending';
 
-		var box = el( 'div', { 'class': 'shb-result-box ' + ( success ? 'is-success' : 'is-fail' ) } );
+		var box = el( 'div', { 'class': 'shb-result-box ' + ( success ? 'is-success' : ( pending ? 'is-pending' : 'is-fail' ) ) } );
 		if ( success ) {
 			box.appendChild( el( 'div', { 'class': 'shb-result-title', text: 'Bedankt, je betaling is gelukt!' } ) );
 			box.appendChild( el( 'div', { 'class': 'shb-result-text', text: 'Je boeking is definitief. Je ontvangt direct een bevestiging per e-mail met alle praktische informatie.' } ) );
+			if ( state.bookingNr ) { box.appendChild( el( 'div', { 'class': 'shb-result-nr', text: 'Boekingsnummer: ' + state.bookingNr } ) ); }
+		} else if ( pending ) {
+			box.appendChild( el( 'div', { 'class': 'shb-result-title', text: 'Je betaling wordt verwerkt.' } ) );
+			box.appendChild( el( 'div', { 'class': 'shb-result-text', text: 'Dit duurt meestal maar even. Zodra de betaling bevestigd is, ontvang je automatisch een bevestiging per e-mail. Je hoeft niet opnieuw te betalen.' } ) );
 			if ( state.bookingNr ) { box.appendChild( el( 'div', { 'class': 'shb-result-nr', text: 'Boekingsnummer: ' + state.bookingNr } ) ); }
 		} else {
 			box.appendChild( el( 'div', { 'class': 'shb-result-title', text: 'De betaling is niet afgerond.' } ) );
@@ -647,7 +658,11 @@
 			wrap.appendChild( sum );
 		}
 
-		wrap.appendChild( el( 'button', { 'class': 'shb-reset', type: 'button', text: success ? 'PLAN NOG EEN VAARTOCHT' : 'OPNIEUW PROBEREN', onclick: function () { reset(); } } ) );
+		if ( pending ) {
+			wrap.appendChild( el( 'button', { 'class': 'shb-reset', type: 'button', text: 'SLUITEN', onclick: function () { setState( { open: false } ); } } ) );
+		} else {
+			wrap.appendChild( el( 'button', { 'class': 'shb-reset', type: 'button', text: success ? 'PLAN NOG EEN VAARTOCHT' : 'OPNIEUW PROBEREN', onclick: function () { reset(); } } ) );
+		}
 		return wrap;
 	}
 
@@ -679,20 +694,45 @@
 	function handleReturn() {
 		var q = new URLSearchParams( window.location.search );
 		var nr = q.get( 'shb_booking' );
-		var status = q.get( 'shb_status' );
 		if ( ! nr ) { return; }
 
-		if ( status === 'paid' ) {
-			var data = null;
-			try { data = JSON.parse( sessionStorage.getItem( 'shb_' + nr ) || 'null' ); } catch ( e ) {}
-			state.fase = 'success';
-			state.bookingNr = nr;
-			state.successData = data;
-			state.open = true;
-		} else {
-			state.fase = 'failed';
-			state.open = true;
-		}
+		// Vraag de ECHTE status bij de server op. De betaalprovider (Mollie)
+		// geeft geen status mee in de terugkeer-URL; die komt via de webhook.
+		// Daarom controleren we het serverzijdig en pollen we kort door voor het
+		// geval de webhook net iets later binnenkomt.
+		state.open = true;
+		state.bookingNr = nr;
+		state.fase = 'checking';
+		checkStatus( nr, 0 );
+	}
+
+	function buildSuccessData( data ) {
+		var rows = ( data.summary || [] ).map( function ( r ) { return { label: r.label, val: r.val }; } );
+		rows.push( { label: '__amount', val: data.amount } );
+		return rows;
+	}
+
+	function checkStatus( nr, attempt ) {
+		api( '/status', { number: nr } ).then( function ( r ) {
+			var st = ( r.ok && r.data ) ? r.data.status : null;
+			if ( st === 'paid' ) {
+				state.fase = 'success';
+				state.successData = buildSuccessData( r.data );
+				render();
+			} else if ( st === 'failed' || st === 'expired' || st === 'cancelled' ) {
+				state.fase = 'failed';
+				render();
+			} else if ( attempt < 6 ) {
+				// Nog pending: webhook kan onderweg zijn, kort doorpollen.
+				setTimeout( function () { checkStatus( nr, attempt + 1 ); }, 1500 );
+			} else {
+				state.fase = 'pending';
+				render();
+			}
+		} ).catch( function () {
+			if ( attempt < 6 ) { setTimeout( function () { checkStatus( nr, attempt + 1 ); }, 1500 ); }
+			else { state.fase = 'pending'; render(); }
+		} );
 	}
 
 	/* ----------------------------------------------------------------- */

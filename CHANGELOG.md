@@ -3,6 +3,12 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.5.1] - 2026-07-12
+
+### Fixed
+- **Terugkeer na betaling toonde ten onrechte "niet afgerond".** Mollie geeft de betaalstatus mee via de webhook, niet in de terugkeer-URL; het scherm leunde op een ontbrekende URL-parameter. De widget vraagt nu de echte status bij de server op (met een status-endpoint) en pollt kort door voor de webhook. Betaalde boekingen tonen nu correct het succes-scherm; er is nooit geld of een boeking verloren gegaan.
+- **Dubbelboek-lek bij overlappende dagdelen.** Beschikbaarheid telde alleen per exact tijdslot, waardoor een "hele dag"-boeking kon worden gemaakt terwijl de sloep 's middags al vergeven was (en andersom). Beschikbaarheid en de boek-lock rekenen nu op tijd-overlap, zodat overlappende dagdelen elkaar blokkeren.
+
 ## [2.5.0] - 2026-07-02
 
 ### Added
