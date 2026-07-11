@@ -63,6 +63,7 @@ class SHB_Admin {
 		);
 
 		add_submenu_page( 'shb-bookings', __( 'Boekingen', 'sloephuren-booking' ), __( 'Boekingen', 'sloephuren-booking' ), self::CAP, 'shb-bookings', array( $this, 'page_bookings' ) );
+		add_submenu_page( 'shb-bookings', __( 'Financieel', 'sloephuren-booking' ), __( 'Financieel', 'sloephuren-booking' ), self::CAP, 'shb-financials', array( $this, 'page_financials' ) );
 		add_submenu_page( 'shb-bookings', __( 'Beschikbaarheid', 'sloephuren-booking' ), __( 'Beschikbaarheid', 'sloephuren-booking' ), self::CAP, 'shb-availability', array( $this, 'page_availability' ) );
 		add_submenu_page( 'shb-bookings', __( 'Sloep-types', 'sloephuren-booking' ), __( 'Sloep-types', 'sloephuren-booking' ), self::CAP, 'shb-boat-types', array( $this, 'page_boat_types' ) );
 		add_submenu_page( 'shb-bookings', __( 'Pakketten', 'sloephuren-booking' ), __( 'Pakketten', 'sloephuren-booking' ), self::CAP, 'shb-products', array( $this, 'page_products' ) );
@@ -159,6 +160,9 @@ class SHB_Admin {
 				break;
 			case 'update_booking_status':
 				$this->update_booking_status();
+				break;
+			case 'delete_booking':
+				$this->delete_booking();
 				break;
 			case 'toggle_block_day':
 				$this->toggle_block_day();
@@ -313,6 +317,18 @@ class SHB_Admin {
 			SHB_Bookings::update_status( $id, $status, $extra );
 		}
 		$this->redirect( 'shb-bookings', 'updated' );
+	}
+
+	/**
+	 * Boeking verwijderen.
+	 */
+	protected function delete_booking() {
+		$this->check_nonce( 'shb_delete_booking' );
+		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		if ( $id ) {
+			SHB_Bookings::delete_booking( $id );
+		}
+		$this->redirect( 'shb-bookings', 'deleted' );
 	}
 
 	/* --------------------------------------------------------------------- */
@@ -584,7 +600,8 @@ class SHB_Admin {
 
 			<p><?php echo esc_html( sprintf( /* translators: %d: aantal */ __( '%d boeking(en) gevonden.', 'sloephuren-booking' ), (int) $data['total'] ) ); ?></p>
 
-			<table class="wp-list-table widefat fixed striped">
+			<div class="shb-table-scroll" style="overflow-x:auto;width:100%;">
+			<table class="wp-list-table widefat striped" style="min-width:1080px;">
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'Nr.', 'sloephuren-booking' ); ?></th>
@@ -618,16 +635,22 @@ class SHB_Admin {
 							<td><?php echo esc_html( $b->num_persons ); ?></td>
 							<td>&euro; <?php echo esc_html( number_format_i18n( (float) $b->amount, 2 ) ); ?></td>
 							<td><span class="shb-status <?php echo esc_attr( $b->status ); ?>"><?php echo esc_html( $this->status_label( $b->status ) ); ?></span></td>
-							<td>
+							<td style="white-space:nowrap;">
 								<form method="post" class="shb-inline-form">
 									<?php wp_nonce_field( 'shb_update_booking_status' ); ?>
 									<input type="hidden" name="shb_action" value="update_booking_status">
 									<input type="hidden" name="id" value="<?php echo esc_attr( $b->id ); ?>">
-									<select name="status" onchange="this.form.submit()">
+									<select name="status" style="max-width:160px;" onchange="this.form.submit()">
 										<?php foreach ( SHB_Bookings::STATUSES as $s ) : ?>
 											<option value="<?php echo esc_attr( $s ); ?>" <?php selected( $b->status, $s ); ?>><?php echo esc_html( $this->status_label( $s ) ); ?></option>
 										<?php endforeach; ?>
 									</select>
+								</form>
+								<form method="post" class="shb-inline-form" onsubmit="return confirm('<?php echo esc_js( __( 'Deze boeking definitief verwijderen?', 'sloephuren-booking' ) ); ?>');">
+									<?php wp_nonce_field( 'shb_delete_booking' ); ?>
+									<input type="hidden" name="shb_action" value="delete_booking">
+									<input type="hidden" name="id" value="<?php echo esc_attr( $b->id ); ?>">
+									<button class="button button-small button-link-delete" title="<?php esc_attr_e( 'Boeking verwijderen', 'sloephuren-booking' ); ?>"><?php esc_html_e( 'Verwijder', 'sloephuren-booking' ); ?></button>
 								</form>
 							</td>
 						</tr>
@@ -635,6 +658,7 @@ class SHB_Admin {
 				<?php endif; ?>
 				</tbody>
 			</table>
+			</div>
 
 			<?php if ( $total_pages > 1 ) : ?>
 				<div class="tablenav"><div class="tablenav-pages">
@@ -663,6 +687,150 @@ class SHB_Admin {
 					?>
 				</div></div>
 			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/* --------------------------------------------------------------------- */
+	/* Scherm: Financieel                                                    */
+	/* --------------------------------------------------------------------- */
+
+	/**
+	 * Financieel overzicht: betaalde omzet met uitsplitsing per maand,
+	 * pakket en sloep, filterbaar op periode.
+	 */
+	public function page_financials() {
+		global $wpdb;
+		$t = SHB_Install::table( 'bookings' );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$year_now = (int) gmdate( 'Y', current_time( 'timestamp' ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
+		$from     = isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : $year_now . '-01-01';
+		$to       = isset( $_GET['to'] ) ? sanitize_text_field( wp_unslash( $_GET['to'] ) ) : $year_now . '-12-31';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $from ) ) {
+			$from = $year_now . '-01-01';
+		}
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $to ) ) {
+			$to = $year_now . '-12-31';
+		}
+
+		// Totalen (alleen betaalde boekingen).
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$totals = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) cnt, COALESCE(SUM(amount),0) sum FROM {$t} WHERE status='paid' AND booking_date BETWEEN %s AND %s", $from, $to ) );
+		$paid_count = (int) $totals->cnt;
+		$paid_sum   = (float) $totals->sum;
+		$avg        = $paid_count ? $paid_sum / $paid_count : 0;
+
+		// Openstaand (pending) + verlopen/mislukt ter info.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$pending = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$t} WHERE status='pending_payment' AND booking_date BETWEEN %s AND %s", $from, $to ) );
+
+		// Per maand.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$by_month = $wpdb->get_results( $wpdb->prepare( "SELECT DATE_FORMAT(booking_date,'%%Y-%%m') ym, COUNT(*) cnt, SUM(amount) sum FROM {$t} WHERE status='paid' AND booking_date BETWEEN %s AND %s GROUP BY ym ORDER BY ym", $from, $to ) );
+		// Per pakket.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$by_product = $wpdb->get_results( $wpdb->prepare( "SELECT product_id, COUNT(*) cnt, SUM(amount) sum FROM {$t} WHERE status='paid' AND booking_date BETWEEN %s AND %s GROUP BY product_id ORDER BY sum DESC", $from, $to ) );
+		// Per sloep.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$by_boat = $wpdb->get_results( $wpdb->prepare( "SELECT boat_type_id, COUNT(*) cnt, SUM(amount) sum FROM {$t} WHERE status='paid' AND booking_date BETWEEN %s AND %s GROUP BY boat_type_id ORDER BY sum DESC", $from, $to ) );
+
+		$products  = $this->id_map( SHB_Bookings::get_products() );
+		$boats     = $this->id_map( SHB_Bookings::get_boat_types() );
+		$months_nl = array( '01' => 'januari', '02' => 'februari', '03' => 'maart', '04' => 'april', '05' => 'mei', '06' => 'juni', '07' => 'juli', '08' => 'augustus', '09' => 'september', '10' => 'oktober', '11' => 'november', '12' => 'december' );
+
+		$eur = function ( $n ) {
+			return '&euro; ' . number_format_i18n( (float) $n, 2 );
+		};
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Financieel overzicht', 'sloephuren-booking' ); ?></h1>
+
+			<form method="get" style="margin:16px 0;background:#fff;padding:12px 16px;border:1px solid #ddd;display:inline-block;">
+				<input type="hidden" name="page" value="shb-financials">
+				<label style="margin-right:8px;"><?php esc_html_e( 'Van', 'sloephuren-booking' ); ?> <input type="date" name="from" value="<?php echo esc_attr( $from ); ?>"></label>
+				<label style="margin-right:8px;"><?php esc_html_e( 'Tot', 'sloephuren-booking' ); ?> <input type="date" name="to" value="<?php echo esc_attr( $to ); ?>"></label>
+				<button class="button button-primary"><?php esc_html_e( 'Toon', 'sloephuren-booking' ); ?></button>
+				<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=shb-financials&from=' . $year_now . '-01-01&to=' . $year_now . '-12-31' ) ); ?>"><?php esc_html_e( 'Dit jaar', 'sloephuren-booking' ); ?></a>
+			</form>
+
+			<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
+				<div style="background:#15324F;color:#fff;border-radius:12px;padding:18px 22px;min-width:200px;">
+					<div style="font-size:13px;opacity:.8;text-transform:uppercase;letter-spacing:.05em;"><?php esc_html_e( 'Betaalde omzet', 'sloephuren-booking' ); ?></div>
+					<div style="font-size:30px;font-weight:700;margin-top:4px;"><?php echo wp_kses_post( $eur( $paid_sum ) ); ?></div>
+				</div>
+				<div style="background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:18px 22px;min-width:150px;">
+					<div style="font-size:13px;color:#787c82;text-transform:uppercase;letter-spacing:.05em;"><?php esc_html_e( 'Betaalde boekingen', 'sloephuren-booking' ); ?></div>
+					<div style="font-size:30px;font-weight:700;margin-top:4px;color:#15324F;"><?php echo esc_html( $paid_count ); ?></div>
+				</div>
+				<div style="background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:18px 22px;min-width:150px;">
+					<div style="font-size:13px;color:#787c82;text-transform:uppercase;letter-spacing:.05em;"><?php esc_html_e( 'Gemiddeld per boeking', 'sloephuren-booking' ); ?></div>
+					<div style="font-size:30px;font-weight:700;margin-top:4px;color:#15324F;"><?php echo wp_kses_post( $eur( $avg ) ); ?></div>
+				</div>
+				<div style="background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:18px 22px;min-width:150px;">
+					<div style="font-size:13px;color:#787c82;text-transform:uppercase;letter-spacing:.05em;"><?php esc_html_e( 'Nog openstaand', 'sloephuren-booking' ); ?></div>
+					<div style="font-size:30px;font-weight:700;margin-top:4px;color:#8a6d00;"><?php echo esc_html( $pending ); ?></div>
+				</div>
+			</div>
+			<p style="color:#787c82;font-size:12px;">
+				<?php esc_html_e( 'Omzet op basis van betaalde boekingen, geteld op vaardatum. Bedragen zijn de betaalde totalen (bruto).', 'sloephuren-booking' ); ?>
+			</p>
+
+			<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+				<div style="flex:1;min-width:320px;">
+					<h2><?php esc_html_e( 'Per maand', 'sloephuren-booking' ); ?></h2>
+					<table class="wp-list-table widefat striped">
+						<thead><tr><th><?php esc_html_e( 'Maand', 'sloephuren-booking' ); ?></th><th><?php esc_html_e( 'Boekingen', 'sloephuren-booking' ); ?></th><th style="text-align:right;"><?php esc_html_e( 'Omzet', 'sloephuren-booking' ); ?></th></tr></thead>
+						<tbody>
+						<?php if ( empty( $by_month ) ) : ?>
+							<tr><td colspan="3"><?php esc_html_e( 'Geen betaalde boekingen in deze periode.', 'sloephuren-booking' ); ?></td></tr>
+						<?php else : ?>
+							<?php foreach ( $by_month as $r ) : ?>
+								<?php list( $yy, $mm ) = explode( '-', $r->ym ); ?>
+								<tr>
+									<td><?php echo esc_html( ucfirst( $months_nl[ $mm ] ) . ' ' . $yy ); ?></td>
+									<td><?php echo esc_html( $r->cnt ); ?></td>
+									<td style="text-align:right;"><?php echo wp_kses_post( $eur( $r->sum ) ); ?></td>
+								</tr>
+							<?php endforeach; ?>
+						<?php endif; ?>
+						</tbody>
+					</table>
+				</div>
+
+				<div style="flex:1;min-width:280px;">
+					<h2><?php esc_html_e( 'Per pakket', 'sloephuren-booking' ); ?></h2>
+					<table class="wp-list-table widefat striped">
+						<thead><tr><th><?php esc_html_e( 'Pakket', 'sloephuren-booking' ); ?></th><th><?php esc_html_e( 'Aantal', 'sloephuren-booking' ); ?></th><th style="text-align:right;"><?php esc_html_e( 'Omzet', 'sloephuren-booking' ); ?></th></tr></thead>
+						<tbody>
+						<?php foreach ( $by_product as $r ) : ?>
+							<tr>
+								<td><?php echo esc_html( isset( $products[ (int) $r->product_id ] ) ? $products[ (int) $r->product_id ]->name : '#' . (int) $r->product_id ); ?></td>
+								<td><?php echo esc_html( $r->cnt ); ?></td>
+								<td style="text-align:right;"><?php echo wp_kses_post( $eur( $r->sum ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						<?php if ( empty( $by_product ) ) : ?><tr><td colspan="3"><?php esc_html_e( 'Geen data.', 'sloephuren-booking' ); ?></td></tr><?php endif; ?>
+						</tbody>
+					</table>
+
+					<h2 style="margin-top:22px;"><?php esc_html_e( 'Per sloep', 'sloephuren-booking' ); ?></h2>
+					<table class="wp-list-table widefat striped">
+						<thead><tr><th><?php esc_html_e( 'Sloep', 'sloephuren-booking' ); ?></th><th><?php esc_html_e( 'Aantal', 'sloephuren-booking' ); ?></th><th style="text-align:right;"><?php esc_html_e( 'Omzet', 'sloephuren-booking' ); ?></th></tr></thead>
+						<tbody>
+						<?php foreach ( $by_boat as $r ) : ?>
+							<tr>
+								<td><?php echo esc_html( isset( $boats[ (int) $r->boat_type_id ] ) ? $boats[ (int) $r->boat_type_id ]->name : '#' . (int) $r->boat_type_id ); ?></td>
+								<td><?php echo esc_html( $r->cnt ); ?></td>
+								<td style="text-align:right;"><?php echo wp_kses_post( $eur( $r->sum ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						<?php if ( empty( $by_boat ) ) : ?><tr><td colspan="3"><?php esc_html_e( 'Geen data.', 'sloephuren-booking' ); ?></td></tr><?php endif; ?>
+						</tbody>
+					</table>
+				</div>
+			</div>
 		</div>
 		<?php
 	}

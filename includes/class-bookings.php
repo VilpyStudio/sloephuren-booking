@@ -545,6 +545,16 @@ class SHB_Bookings {
 	}
 
 	/**
+	 * Boeking definitief verwijderen.
+	 *
+	 * @param int $id Boeking-ID.
+	 */
+	public static function delete_booking( $id ) {
+		global $wpdb;
+		$wpdb->delete( SHB_Install::table( 'bookings' ), array( 'id' => (int) $id ), array( '%d' ) );
+	}
+
+	/**
 	 * Verlopen pending-boekingen markeren als 'expired'.
 	 *
 	 * Wordt aangeroepen door de cron. Boekingen ouder dan de pending-window

@@ -3,6 +3,15 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.6.0] - 2026-07-12
+
+### Added
+- **Financieel overzicht** (Sloephuren → Financieel): betaalde omzet, aantal boekingen, gemiddelde en openstaand, met uitsplitsing per maand, per pakket en per sloep. Filterbaar op periode.
+- Boekingen kunnen nu **verwijderd** worden vanuit het boekingenoverzicht.
+
+### Fixed
+- De statuskeuze in de "Actie"-kolom van het boekingenoverzicht viel bij veel kolommen van de pagina. De tabel is nu horizontaal scrollbaar en de kolommen passen netjes.
+
 ## [2.5.2] - 2026-07-12
 
 ### Fixed
