@@ -295,8 +295,21 @@ class SHB_Admin {
 
 		update_option( 'shb_mollie_api_key', sanitize_text_field( wp_unslash( $_POST['mollie_api_key'] ?? '' ) ) );
 
-		$admin_email = sanitize_email( wp_unslash( $_POST['admin_email'] ?? '' ) );
-		update_option( 'shb_admin_email', is_email( $admin_email ) ? $admin_email : get_option( 'admin_email' ) );
+		// Beheerder-ontvangers: meerdere adressen toegestaan (komma of nieuwe regel).
+		$raw_admins = wp_unslash( $_POST['admin_email'] ?? '' );
+		$clean      = array();
+		foreach ( preg_split( '/[,;\r\n]+/', (string) $raw_admins ) as $part ) {
+			$part = sanitize_email( trim( $part ) );
+			if ( $part && is_email( $part ) ) {
+				$clean[] = $part;
+			}
+		}
+		update_option( 'shb_admin_email', $clean ? implode( ', ', array_unique( $clean ) ) : get_option( 'admin_email' ) );
+
+		// Afzender.
+		update_option( 'shb_from_name', sanitize_text_field( wp_unslash( $_POST['from_name'] ?? '' ) ) );
+		$from_email = sanitize_email( wp_unslash( $_POST['from_email'] ?? '' ) );
+		update_option( 'shb_from_email', is_email( $from_email ) ? $from_email : '' );
 
 		update_option( 'shb_terms_url', esc_url_raw( wp_unslash( $_POST['terms_url'] ?? '' ) ) );
 
@@ -1456,9 +1469,21 @@ class SHB_Admin {
 				<input type="number" name="pending_minutes" min="1" value="<?php echo esc_attr( get_option( 'shb_pending_minutes', 15 ) ); ?>">
 				<p class="description"><?php esc_html_e( 'Hoe lang een niet-betaalde boeking het tijdslot bezet houdt.', 'sloephuren-booking' ); ?></p>
 
-				<h2><?php esc_html_e( 'E-mail & voorwaarden', 'sloephuren-booking' ); ?></h2>
-				<label><?php esc_html_e( 'E-mail beheerder', 'sloephuren-booking' ); ?></label>
-				<input type="email" name="admin_email" value="<?php echo esc_attr( get_option( 'shb_admin_email', get_option( 'admin_email' ) ) ); ?>">
+				<h2><?php esc_html_e( 'E-mail', 'sloephuren-booking' ); ?></h2>
+
+				<label><?php esc_html_e( 'Afzendernaam', 'sloephuren-booking' ); ?></label>
+				<input type="text" name="from_name" value="<?php echo esc_attr( get_option( 'shb_from_name', '' ) ); ?>" placeholder="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
+				<p class="description"><?php esc_html_e( 'De naam die klanten als afzender zien. Leeg = de sitenaam.', 'sloephuren-booking' ); ?></p>
+
+				<label><?php esc_html_e( 'Afzender e-mailadres', 'sloephuren-booking' ); ?></label>
+				<input type="email" name="from_email" value="<?php echo esc_attr( get_option( 'shb_from_email', '' ) ); ?>" placeholder="bijv. info@sloephurenzaanstad.nl">
+				<p class="description"><?php esc_html_e( 'Gebruik bij voorkeur een adres op je eigen domein (sloephurenzaanstad.nl) voor betere bezorging. Leeg = noreply@je-domein.', 'sloephuren-booking' ); ?></p>
+
+				<label><?php esc_html_e( 'E-mails beheerder(s)', 'sloephuren-booking' ); ?></label>
+				<textarea name="admin_email" rows="3" style="min-width:280px;width:100%;max-width:420px;"><?php echo esc_textarea( get_option( 'shb_admin_email', get_option( 'admin_email' ) ) ); ?></textarea>
+				<p class="description"><?php esc_html_e( 'Wie de melding van een nieuwe boeking ontvangt. Meerdere adressen: gescheiden door een komma of op een nieuwe regel.', 'sloephuren-booking' ); ?></p>
+
+				<h2><?php esc_html_e( 'Voorwaarden', 'sloephuren-booking' ); ?></h2>
 				<label><?php esc_html_e( 'URL voorwaarden', 'sloephuren-booking' ); ?></label>
 				<input type="text" name="terms_url" value="<?php echo esc_attr( get_option( 'shb_terms_url', '' ) ); ?>" placeholder="https://...">
 

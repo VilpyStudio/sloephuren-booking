@@ -3,6 +3,13 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.7.0] - 2026-07-12
+
+### Added
+- **Nette afzender** voor de mails: instelbare afzendernaam en afzender-e-mailadres (Sloephuren → Instellingen), i.p.v. de standaard "WordPress". Standaard de sitenaam + noreply@je-domein.
+- **Meerdere beheerder-mailadressen**: de melding van een nieuwe boeking kan naar meerdere adressen (komma of nieuwe regel) zodat je niet hoeft door te sturen.
+- Slimme Reply-To: klant beantwoordt de bevestiging naar de beheerder; de beheerder beantwoordt de melding rechtstreeks naar de klant.
+
 ## [2.6.0] - 2026-07-12
 
 ### Added

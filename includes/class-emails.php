@@ -15,12 +15,67 @@ if ( ! defined( 'ABSPATH' ) ) {
 class SHB_Emails {
 
 	/**
-	 * HTML-mailheaders.
+	 * Afzendernaam voor de mails.
 	 *
+	 * @return string
+	 */
+	protected static function from_name() {
+		$name = trim( (string) get_option( 'shb_from_name', '' ) );
+		return '' !== $name ? $name : get_bloginfo( 'name' );
+	}
+
+	/**
+	 * Afzender-e-mailadres. Valt terug op noreply@<domein> zodat de mail
+	 * niet als "wordpress@..." wordt verstuurd.
+	 *
+	 * @return string
+	 */
+	protected static function from_email() {
+		$email = trim( (string) get_option( 'shb_from_email', '' ) );
+		if ( $email && is_email( $email ) ) {
+			return $email;
+		}
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+		$host = $host ? preg_replace( '/^www\./', '', $host ) : 'localhost';
+		return 'noreply@' . $host;
+	}
+
+	/**
+	 * Beheerder-ontvangers (kan meerdere adressen bevatten, gescheiden door
+	 * komma, puntkomma of nieuwe regel).
+	 *
+	 * @return array Lijst geldige e-mailadressen.
+	 */
+	protected static function admin_recipients() {
+		$raw    = (string) get_option( 'shb_admin_email', get_option( 'admin_email' ) );
+		$emails = array();
+		foreach ( preg_split( '/[,;\r\n]+/', $raw ) as $part ) {
+			$part = sanitize_email( trim( $part ) );
+			if ( $part && is_email( $part ) ) {
+				$emails[] = $part;
+			}
+		}
+		if ( ! $emails ) {
+			$emails[] = get_option( 'admin_email' );
+		}
+		return array_values( array_unique( $emails ) );
+	}
+
+	/**
+	 * HTML-mailheaders, inclusief nette afzender en optionele Reply-To.
+	 *
+	 * @param string $reply_to Optioneel Reply-To-adres.
 	 * @return array
 	 */
-	protected static function headers() {
-		return array( 'Content-Type: text/html; charset=UTF-8' );
+	protected static function headers( $reply_to = '' ) {
+		$headers = array(
+			'Content-Type: text/html; charset=UTF-8',
+			sprintf( 'From: %s <%s>', self::from_name(), self::from_email() ),
+		);
+		if ( $reply_to && is_email( $reply_to ) ) {
+			$headers[] = 'Reply-To: ' . $reply_to;
+		}
+		return $headers;
 	}
 
 	/**
@@ -183,11 +238,13 @@ class SHB_Emails {
 			$d['number']
 		);
 
+		// Klant kan antwoorden; dat komt bij de beheerder terecht.
+		$reply_to = self::admin_recipients();
 		return wp_mail(
 			$booking->customer_email,
 			$subject,
 			self::wrap( __( 'Boeking bevestigd', 'sloephuren-booking' ), $body ),
-			self::headers()
+			self::headers( $reply_to[0] )
 		);
 	}
 
@@ -200,10 +257,7 @@ class SHB_Emails {
 	public static function send_admin_notification( $booking ) {
 		$d = self::booking_details( $booking );
 
-		$admin_email = get_option( 'shb_admin_email', get_option( 'admin_email' ) );
-		if ( ! is_email( $admin_email ) ) {
-			$admin_email = get_option( 'admin_email' );
-		}
+		$recipients = self::admin_recipients();
 
 		$contact = '<p style="margin-top:20px;"><strong>' . esc_html__( 'Contactgegevens klant', 'sloephuren-booking' ) . '</strong><br>';
 		$contact .= esc_html( $d['name'] ) . '<br>';
@@ -220,11 +274,12 @@ class SHB_Emails {
 			$d['date']
 		);
 
+		// Reply-To = klant, zodat je direct kunt antwoorden aan de klant.
 		return wp_mail(
-			$admin_email,
+			$recipients,
 			$subject,
 			self::wrap( __( 'Nieuwe boeking', 'sloephuren-booking' ), $body ),
-			self::headers()
+			self::headers( $d['email'] )
 		);
 	}
 }
