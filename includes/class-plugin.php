@@ -51,6 +51,8 @@ class SHB_Plugin {
 
 		// REST API.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+		// Dynamische endpoints nooit laten cachen (LiteSpeed/CDN/browser).
+		add_filter( 'rest_post_dispatch', array( $this, 'no_cache_rest' ), 10, 3 );
 
 		// Mock-betaalpagina en retour-afhandeling.
 		add_action( 'template_redirect', array( $this, 'handle_frontend_actions' ) );
@@ -358,6 +360,33 @@ class SHB_Plugin {
 				'permission_callback' => '__return_true',
 			)
 		);
+	}
+
+	/**
+	 * Voorkom dat de plugin-endpoints gecachet worden.
+	 *
+	 * Beschikbaarheid, status en boekingen zijn live data. LiteSpeed cachet
+	 * REST-responses standaard (zagen we: 7 dagen), waardoor bezoekers oude
+	 * beschikbaarheid krijgen en dubbel kunnen boeken. We sturen daarom expliciet
+	 * no-cache mee voor alles onder onze namespace.
+	 *
+	 * @param WP_HTTP_Response $response Response.
+	 * @param WP_REST_Server   $server   Server.
+	 * @param WP_REST_Request  $request  Verzoek.
+	 * @return WP_HTTP_Response
+	 */
+	public function no_cache_rest( $response, $server, $request ) {
+		$route = $request ? $request->get_route() : '';
+		if ( is_string( $route ) && 0 === strpos( $route, '/' . self::REST_NS ) ) {
+			if ( is_object( $response ) && method_exists( $response, 'header' ) ) {
+				$response->header( 'Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0' );
+				$response->header( 'Pragma', 'no-cache' );
+			}
+			// LiteSpeed Cache bepaalt zijn eigen cache-header via zijn API; met
+			// deze actie weet de plugin dat deze request NIET gecachet mag worden.
+			do_action( 'litespeed_control_set_nocache', 'Sloephuren dynamische API' );
+		}
+		return $response;
 	}
 
 	/**

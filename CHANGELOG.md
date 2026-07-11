@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.5.2] - 2026-07-12
+
+### Fixed
+- **LiteSpeed cachete de beschikbaarheids-API 7 dagen**, waardoor bezoekers oude beschikbaarheid zagen en (ondanks de overlap-fix) alsnog geboekte dagdelen konden boeken. De dynamische endpoints (`/wp-json/sloephuren/v1/*`) sturen nu no-cache mee en zetten LiteSpeed's eigen no-cache via `litespeed_control_set_nocache`. Beschikbaarheid, status en boekingen zijn nu altijd live.
+
 ## [2.5.1] - 2026-07-12
 
 ### Fixed
