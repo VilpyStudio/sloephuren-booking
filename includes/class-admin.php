@@ -192,8 +192,18 @@ class SHB_Admin {
 	 * @param string $message Meldingssleutel.
 	 */
 	protected function redirect( $page, $message = 'saved' ) {
+		$this->purge_cache();
 		wp_safe_redirect( add_query_arg( array( 'page' => $page, 'shb_msg' => $message ), admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	/**
+	 * Cache van de site legen na een wijziging, zodat bezoekers geen oude
+	 * sloepen/prijzen/beschikbaarheid meer zien. Werkt met LiteSpeed (en doet
+	 * niets als dat niet actief is).
+	 */
+	protected function purge_cache() {
+		do_action( 'litespeed_purge_all' );
 	}
 
 	/**
@@ -376,6 +386,7 @@ class SHB_Admin {
 	 * @param int    $slot Dagdeel-scope (0 = hele dag).
 	 */
 	protected function redirect_availability( $msg, $boat, $ym, $slot = 0 ) {
+		$this->purge_cache();
 		wp_safe_redirect(
 			add_query_arg(
 				array(

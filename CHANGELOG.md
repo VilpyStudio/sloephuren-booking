@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.8.2] - 2026-07-13
+
+### Fixed
+- Elke wijziging in de admin (sloep, prijs, pakket, tijdslot, blokkade, instelling of boeking) leegt nu automatisch de LiteSpeed-cache, zodat bezoekers meteen de actuele sloepen, prijzen en beschikbaarheid zien. Geen handmatig cache legen meer nodig.
+
 ## [2.8.1] - 2026-07-13
 
 ### Fixed
