@@ -238,17 +238,23 @@
 
 		setState( { fase: 'processing', errors: {} } );
 
-		apiPost( '/book', {
-			product_id: state.pakket,
-			boat_type_id: state.sloep,
-			timeslot_id: state.slot,
-			date: state.datum,
-			name: state.naam.trim(),
-			email: state.email.trim(),
-			phone: state.tel.trim(),
-			persons: state.personen,
-			agree: state.akkoord ? 1 : 0,
-			return_url: D.return
+		// Haal eerst een VERSE nonce op. De pagina kan gecachet zijn (LiteSpeed),
+		// waardoor de ingebakken nonce verlopen is en /book anders 403 geeft.
+		api( '/token' ).then( function ( t ) {
+			if ( t.ok && t.data && t.data.nonce ) { D.nonce = t.data.nonce; }
+		} ).catch( function () {} ).then( function () {
+			return apiPost( '/book', {
+				product_id: state.pakket,
+				boat_type_id: state.sloep,
+				timeslot_id: state.slot,
+				date: state.datum,
+				name: state.naam.trim(),
+				email: state.email.trim(),
+				phone: state.tel.trim(),
+				persons: state.personen,
+				agree: state.akkoord ? 1 : 0,
+				return_url: D.return
+			} );
 		} ).then( function ( r ) {
 			if ( ! r.ok || ! r.data.checkout_url ) {
 				setState( { fase: 'form', errors: { server: ( r.data && r.data.error ) || 'Er ging iets mis. Probeer het opnieuw.' } } );

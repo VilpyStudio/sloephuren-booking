@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.7.1] - 2026-07-12
+
+### Fixed
+- **Bezoekers konden niet afrekenen (403 "Cookie controle mislukt").** De beveiligings-nonce zat in de door LiteSpeed gecachte pagina en was verlopen. De widget haalt nu vlak voor het boeken een verse nonce op via een niet-gecachet REST-endpoint (`/token`), zodat afrekenen werkt ongeacht paginacache.
+
 ## [2.7.0] - 2026-07-12
 
 ### Added

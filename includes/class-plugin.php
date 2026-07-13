@@ -339,6 +339,18 @@ class SHB_Plugin {
 			)
 		);
 
+		// Verse beveiligings-nonce (nodig omdat de pagina gecachet kan zijn en
+		// de ingebakken nonce dan verlopen is). Dit endpoint is niet-gecachet.
+		register_rest_route(
+			self::REST_NS,
+			'/token',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'rest_token' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
 		// Boeking + betaling starten.
 		register_rest_route(
 			self::REST_NS,
@@ -436,6 +448,16 @@ class SHB_Plugin {
 
 		$boats = SHB_Availability::get_available_boat_types( $product_id, $date, $timeslot_id );
 		return new WP_REST_Response( array( 'boats' => $boats ), 200 );
+	}
+
+	/**
+	 * REST: verse wp_rest-nonce teruggeven.
+	 *
+	 * @param WP_REST_Request $request Verzoek.
+	 * @return WP_REST_Response
+	 */
+	public function rest_token( $request ) {
+		return new WP_REST_Response( array( 'nonce' => wp_create_nonce( 'wp_rest' ) ), 200 );
 	}
 
 	/**
