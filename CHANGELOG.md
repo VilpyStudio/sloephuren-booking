@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.8.1] - 2026-07-13
+
+### Fixed
+- Prijs per sloep werd bij bezoekers nog niet toegepast doordat browsers de widget-JS tot een jaar cachen; de versie is opgehoogd zodat iedereen de nieuwe JS ophaalt. (De prijs-per-sloep-functie zelf werkte correct.)
+
 ## [2.8.0] - 2026-07-12
 
 ### Added
