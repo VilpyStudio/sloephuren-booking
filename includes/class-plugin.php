@@ -221,6 +221,7 @@ class SHB_Plugin {
 				'nonce'       => wp_create_nonce( 'wp_rest' ),
 				'products'    => $products,
 				'boats'       => $boats,
+				'boatPrices'  => SHB_Bookings::get_price_overrides(),
 				'return'      => esc_url_raw( $this->current_url() ),
 				'terms'       => esc_url_raw( get_option( 'shb_terms_url', '' ) ),
 				'logo'        => esc_url_raw( SHB_PLUGIN_URL . 'public/img/logo-mark.png?v=' . SHB_VERSION ),
@@ -590,7 +591,8 @@ class SHB_Plugin {
 				'customer_email' => $email,
 				'customer_phone' => $phone,
 				'num_persons'    => $persons,
-				'amount'         => (float) $product->price,
+				// Effectieve prijs: eventuele sloep-specifieke prijs, anders pakketprijs.
+				'amount'         => SHB_Bookings::effective_price( $boat_id, $product_id ),
 				'return_url'     => $return_url,
 			)
 		);

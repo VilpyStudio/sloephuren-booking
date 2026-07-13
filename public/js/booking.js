@@ -39,7 +39,22 @@
 		};
 	} );
 
-	var MIN_PRICE = PRODUCTS.length ? Math.min.apply( null, PRODUCTS.map( function ( p ) { return p.price; } ) ) : 265;
+	// Prijzen kunnen per sloep afwijken (D.boatPrices[boatId][productId]).
+	var _allPrices = PRODUCTS.map( function ( p ) { return p.price; } );
+	if ( D.boatPrices ) {
+		Object.keys( D.boatPrices ).forEach( function ( b ) {
+			Object.keys( D.boatPrices[ b ] ).forEach( function ( pr ) { _allPrices.push( Number( D.boatPrices[ b ][ pr ] ) ); } );
+		} );
+	}
+	var MIN_PRICE = _allPrices.length ? Math.min.apply( null, _allPrices ) : 265;
+
+	// Effectieve prijs voor een pakket bij de gekozen sloep.
+	function effectivePrice( p ) {
+		if ( ! p ) { return 0; }
+		var over = ( D.boatPrices && state.sloep != null ) ? D.boatPrices[ state.sloep ] : null;
+		if ( over && over[ p.id ] != null ) { return Number( over[ p.id ] ); }
+		return p.price;
+	}
 
 	// Vaste sloep (koppeling aan één boot): naam -> boot.
 	var FIXED_BOAT = null;
@@ -262,7 +277,7 @@
 			}
 			// Samenvatting bewaren zodat het successcherm na de betaling compleet is.
 			try {
-				sessionStorage.setItem( 'shb_' + r.data.booking_number, JSON.stringify( summaryData().concat( [ { label: '__amount', val: product() ? product().price : 0 } ] ) ) );
+				sessionStorage.setItem( 'shb_' + r.data.booking_number, JSON.stringify( summaryData().concat( [ { label: '__amount', val: product() ? effectivePrice( product() ) : 0 } ] ) ) );
 			} catch ( e ) {}
 			window.location.href = r.data.checkout_url;
 		} ).catch( function () {
@@ -415,7 +430,7 @@
 		} ) ); }
 
 		if ( step === 2 ) { return renderCards( PRODUCTS.map( function ( p ) {
-			return { sel: state.pakket === p.id, name: p.name, sub: p.sub, price: euro( p.price ), onClick: function () { setState( { pakket: p.id, slot: null } ); autoAdvance(); } };
+			return { sel: state.pakket === p.id, name: p.name, sub: p.sub, price: euro( effectivePrice( p ) ), onClick: function () { setState( { pakket: p.id, slot: null } ); autoAdvance(); } };
 		} ) ); }
 
 		if ( step === 3 ) { return renderCalendar(); }
@@ -675,7 +690,7 @@
 	function renderActionBar( step, processing ) {
 		var p = product();
 		var parts = summaryParts();
-		var stickyPrijs = p ? euro( p.price ) : 'Vanaf ' + euro( MIN_PRICE );
+		var stickyPrijs = p ? euro( effectivePrice( p ) ) : 'Vanaf ' + euro( MIN_PRICE );
 		var stickySub = processing ? 'Je wordt doorgestuurd naar iDEAL' : ( parts.length ? parts.join( ' · ' ) : 'Nog niets gekozen' );
 		var canN = canNext( step ) && ! processing;
 		var nextLabel = step < 5 ? 'Volgende' : ( processing ? 'Bezig met betalen...' : 'Boek & betaal' );

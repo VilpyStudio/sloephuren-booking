@@ -201,8 +201,8 @@ class SHB_Admin {
 	 */
 	protected function save_boat_type() {
 		$this->check_nonce( 'shb_save_boat_type' );
-		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
-		SHB_Bookings::save_boat_type(
+		$id      = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		$boat_id = SHB_Bookings::save_boat_type(
 			array(
 				'name'        => wp_unslash( $_POST['name'] ?? '' ),
 				'stock'       => $_POST['stock'] ?? 1,
@@ -212,6 +212,13 @@ class SHB_Admin {
 			),
 			$id
 		);
+
+		// Prijs per pakket (override); leeg veld = standaardprijs van het pakket.
+		$prices = isset( $_POST['prices'] ) && is_array( $_POST['prices'] ) ? wp_unslash( $_POST['prices'] ) : array();
+		foreach ( SHB_Bookings::get_products() as $p ) {
+			$val = isset( $prices[ $p->id ] ) ? $prices[ $p->id ] : '';
+			SHB_Bookings::set_boat_price( $boat_id, (int) $p->id, $val );
+		}
 		$this->redirect( 'shb-boat-types' );
 	}
 
@@ -1206,7 +1213,23 @@ class SHB_Admin {
 				<input type="number" name="stock" min="0" value="<?php echo esc_attr( $editing ? $editing->stock : 1 ); ?>" required>
 				<label><?php esc_html_e( 'Max personen', 'sloephuren-booking' ); ?></label>
 				<input type="number" name="max_persons" min="1" value="<?php echo esc_attr( $editing ? $editing->max_persons : 8 ); ?>" required>
-				<label><?php esc_html_e( 'Sorteervolgorde', 'sloephuren-booking' ); ?></label>
+
+				<?php
+				$price_over = $editing ? SHB_Bookings::get_boat_price_overrides( $editing->id ) : array();
+				$products   = SHB_Bookings::get_products( true );
+				if ( $products ) :
+					?>
+					<p style="margin:16px 0 4px;font-weight:600;"><?php esc_html_e( 'Prijs per pakket', 'sloephuren-booking' ); ?></p>
+					<p class="description" style="margin-top:0;"><?php esc_html_e( 'Laat leeg voor de standaardprijs van het pakket. Vul een bedrag in om deze sloep goedkoper (of duurder) te maken.', 'sloephuren-booking' ); ?></p>
+					<?php foreach ( $products as $p ) : ?>
+						<label><?php echo esc_html( $p->name ); ?></label>
+						<input type="text" name="prices[<?php echo esc_attr( $p->id ); ?>]"
+							value="<?php echo isset( $price_over[ (int) $p->id ] ) ? esc_attr( number_format( $price_over[ (int) $p->id ], 2, '.', '' ) ) : ''; ?>"
+							placeholder="<?php echo esc_attr( sprintf( /* translators: %s: standaardprijs */ __( 'standaard %s', 'sloephuren-booking' ), '€ ' . number_format_i18n( (float) $p->price, 2 ) ) ); ?>">
+					<?php endforeach; ?>
+				<?php endif; ?>
+
+				<label style="margin-top:16px;"><?php esc_html_e( 'Sorteervolgorde', 'sloephuren-booking' ); ?></label>
 				<input type="number" name="sort_order" value="<?php echo esc_attr( $editing ? $editing->sort_order : 0 ); ?>">
 				<label><input type="checkbox" name="active" value="1" <?php checked( $editing ? $editing->active : 1, 1 ); ?>> <?php esc_html_e( 'Actief', 'sloephuren-booking' ); ?></label>
 				<p><button class="button button-primary"><?php esc_html_e( 'Opslaan', 'sloephuren-booking' ); ?></button>

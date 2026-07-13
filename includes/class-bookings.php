@@ -180,6 +180,87 @@ class SHB_Bookings {
 	}
 
 	/* --------------------------------------------------------------------- */
+	/* Prijs per sloep (override op de standaard pakketprijs)                */
+	/* --------------------------------------------------------------------- */
+
+	/**
+	 * Alle prijs-overrides als map [boat_type_id][product_id] => price.
+	 *
+	 * @return array
+	 */
+	public static function get_price_overrides() {
+		global $wpdb;
+		$table = SHB_Install::table( 'boat_prices' );
+		$map   = array();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		foreach ( $wpdb->get_results( "SELECT boat_type_id, product_id, price FROM {$table}" ) as $r ) {
+			$map[ (int) $r->boat_type_id ][ (int) $r->product_id ] = (float) $r->price;
+		}
+		return $map;
+	}
+
+	/**
+	 * Prijs-overrides voor één sloep: [product_id] => price.
+	 *
+	 * @param int $boat_type_id Sloep-ID.
+	 * @return array
+	 */
+	public static function get_boat_price_overrides( $boat_type_id ) {
+		global $wpdb;
+		$table = SHB_Install::table( 'boat_prices' );
+		$map   = array();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT product_id, price FROM {$table} WHERE boat_type_id = %d", (int) $boat_type_id ) ) as $r ) {
+			$map[ (int) $r->product_id ] = (float) $r->price;
+		}
+		return $map;
+	}
+
+	/**
+	 * Prijs-override zetten of (bij lege waarde) verwijderen.
+	 *
+	 * @param int         $boat_type_id Sloep-ID.
+	 * @param int         $product_id   Pakket-ID.
+	 * @param string|null $price        Prijs, of leeg/null om de override te wissen.
+	 */
+	public static function set_boat_price( $boat_type_id, $product_id, $price ) {
+		global $wpdb;
+		$table = SHB_Install::table( 'boat_prices' );
+
+		if ( null === $price || '' === trim( (string) $price ) ) {
+			$wpdb->delete( $table, array( 'boat_type_id' => (int) $boat_type_id, 'product_id' => (int) $product_id ), array( '%d', '%d' ) );
+			return;
+		}
+
+		$value    = round( (float) str_replace( ',', '.', $price ), 2 );
+		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE boat_type_id = %d AND product_id = %d", (int) $boat_type_id, (int) $product_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( $existing ) {
+			$wpdb->update( $table, array( 'price' => $value ), array( 'id' => (int) $existing ), array( '%f' ), array( '%d' ) );
+		} else {
+			$wpdb->insert( $table, array( 'boat_type_id' => (int) $boat_type_id, 'product_id' => (int) $product_id, 'price' => $value ), array( '%d', '%d', '%f' ) );
+		}
+	}
+
+	/**
+	 * Effectieve prijs voor een sloep + pakket: de override indien aanwezig,
+	 * anders de standaardprijs van het pakket.
+	 *
+	 * @param int $boat_type_id Sloep-ID.
+	 * @param int $product_id   Pakket-ID.
+	 * @return float
+	 */
+	public static function effective_price( $boat_type_id, $product_id ) {
+		global $wpdb;
+		$table = SHB_Install::table( 'boat_prices' );
+		$over  = $wpdb->get_var( $wpdb->prepare( "SELECT price FROM {$table} WHERE boat_type_id = %d AND product_id = %d", (int) $boat_type_id, (int) $product_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( null !== $over ) {
+			return (float) $over;
+		}
+		$product = self::get_product( (int) $product_id );
+		return $product ? (float) $product->price : 0.0;
+	}
+
+	/* --------------------------------------------------------------------- */
 	/* Tijdsloten                                                            */
 	/* --------------------------------------------------------------------- */
 

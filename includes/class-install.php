@@ -81,8 +81,9 @@ class SHB_Install {
 		$boat_types = self::table( 'boat_types' );
 		$products   = self::table( 'products' );
 		$timeslots  = self::table( 'timeslots' );
-		$bookings   = self::table( 'bookings' );
-		$blocks     = self::table( 'blocks' );
+		$bookings    = self::table( 'bookings' );
+		$blocks      = self::table( 'blocks' );
+		$boat_prices = self::table( 'boat_prices' );
 
 		// Sloep-types: naam, voorraad, max personen, actief.
 		$sql_boat_types = "CREATE TABLE {$boat_types} (
@@ -169,11 +170,22 @@ class SHB_Install {
 			KEY boat_type_id (boat_type_id)
 		) {$charset_collate};";
 
+		// Prijs per sloep + pakket (override op de standaard pakketprijs).
+		$sql_boat_prices = "CREATE TABLE {$boat_prices} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			boat_type_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			product_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+			PRIMARY KEY  (id),
+			UNIQUE KEY boat_product (boat_type_id,product_id)
+		) {$charset_collate};";
+
 		dbDelta( $sql_boat_types );
 		dbDelta( $sql_products );
 		dbDelta( $sql_timeslots );
 		dbDelta( $sql_bookings );
 		dbDelta( $sql_blocks );
+		dbDelta( $sql_boat_prices );
 	}
 
 	/**

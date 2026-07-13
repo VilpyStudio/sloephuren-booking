@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.8.0] - 2026-07-12
+
+### Added
+- **Prijs per sloep**: bij een sloep-type kun je nu per pakket een eigen prijs invullen (Sloephuren → Sloep-types → Bewerk → "Prijs per pakket"). Laat leeg voor de standaardprijs van het pakket, of vul een bedrag in om die sloep goedkoper (of duurder) te verhuren. De widget toont automatisch de juiste prijs zodra de sloep gekozen is, en de boeking rekent server-side met die prijs.
+
 ## [2.7.1] - 2026-07-12
 
 ### Fixed
