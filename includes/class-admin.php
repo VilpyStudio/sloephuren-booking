@@ -217,6 +217,7 @@ class SHB_Admin {
 				'name'        => wp_unslash( $_POST['name'] ?? '' ),
 				'stock'       => $_POST['stock'] ?? 1,
 				'max_persons' => $_POST['max_persons'] ?? 8,
+				'image_id'    => $_POST['image_id'] ?? 0,
 				'active'      => $_POST['active'] ?? 0,
 				'sort_order'  => $_POST['sort_order'] ?? 0,
 			),
@@ -1167,6 +1168,12 @@ class SHB_Admin {
 		$edit_id = isset( $_GET['edit'] ) ? (int) $_GET['edit'] : 0;
 		$editing = $edit_id ? SHB_Bookings::get_boat_type( $edit_id ) : null;
 		$rows    = SHB_Bookings::get_boat_types();
+
+		// Mediabibliotheek laden voor de afbeeldingskiezer.
+		wp_enqueue_media();
+
+		$img_id      = ( $editing && isset( $editing->image_id ) ) ? (int) $editing->image_id : 0;
+		$preview_url = $img_id ? wp_get_attachment_image_url( $img_id, 'thumbnail' ) : '';
 		?>
 		<div class="wrap shb-admin-form">
 			<h1><?php esc_html_e( 'Sloep-types', 'sloephuren-booking' ); ?></h1>
@@ -1225,6 +1232,14 @@ class SHB_Admin {
 				<label><?php esc_html_e( 'Max personen', 'sloephuren-booking' ); ?></label>
 				<input type="number" name="max_persons" min="1" value="<?php echo esc_attr( $editing ? $editing->max_persons : 8 ); ?>" required>
 
+				<label><?php esc_html_e( 'Foto (mini-thumbnail in de widget)', 'sloephuren-booking' ); ?></label>
+				<input type="hidden" name="image_id" id="shb-image-id" value="<?php echo esc_attr( $img_id ); ?>">
+				<div style="margin:4px 0 8px;">
+					<img id="shb-image-preview" src="<?php echo esc_url( $preview_url ); ?>" alt="" style="<?php echo $preview_url ? '' : 'display:none;'; ?>width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid #dcdcde;vertical-align:middle;margin-right:10px;">
+					<button type="button" class="button" id="shb-image-choose"><?php esc_html_e( 'Kies afbeelding', 'sloephuren-booking' ); ?></button>
+					<button type="button" class="button" id="shb-image-remove" style="<?php echo $preview_url ? '' : 'display:none;'; ?>"><?php esc_html_e( 'Verwijder', 'sloephuren-booking' ); ?></button>
+				</div>
+
 				<?php
 				$price_over = $editing ? SHB_Bookings::get_boat_price_overrides( $editing->id ) : array();
 				$products   = SHB_Bookings::get_products( true );
@@ -1247,6 +1262,44 @@ class SHB_Admin {
 				<?php if ( $editing ) : ?><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=shb-boat-types' ) ); ?>"><?php esc_html_e( 'Annuleren', 'sloephuren-booking' ); ?></a><?php endif; ?></p>
 			</form>
 		</div>
+		<script>
+		( function() {
+			var frame,
+				choose  = document.getElementById( 'shb-image-choose' ),
+				remove  = document.getElementById( 'shb-image-remove' ),
+				field   = document.getElementById( 'shb-image-id' ),
+				preview = document.getElementById( 'shb-image-preview' );
+			if ( ! choose || ! window.wp || ! window.wp.media ) { return; }
+			choose.addEventListener( 'click', function( e ) {
+				e.preventDefault();
+				if ( frame ) { frame.open(); return; }
+				frame = wp.media( {
+					title: <?php echo wp_json_encode( __( 'Kies een foto voor deze sloep', 'sloephuren-booking' ) ); ?>,
+					button: { text: <?php echo wp_json_encode( __( 'Gebruik deze foto', 'sloephuren-booking' ) ); ?> },
+					library: { type: 'image' },
+					multiple: false
+				} );
+				frame.on( 'select', function() {
+					var att = frame.state().get( 'selection' ).first().toJSON(),
+						url = ( att.sizes && att.sizes.thumbnail ) ? att.sizes.thumbnail.url : att.url;
+					field.value = att.id;
+					preview.src = url;
+					preview.style.display = '';
+					remove.style.display = '';
+				} );
+				frame.open();
+			} );
+			if ( remove ) {
+				remove.addEventListener( 'click', function( e ) {
+					e.preventDefault();
+					field.value = 0;
+					preview.src = '';
+					preview.style.display = 'none';
+					remove.style.display = 'none';
+				} );
+			}
+		} )();
+		</script>
 		<?php
 	}
 

@@ -272,11 +272,21 @@
 	justify-content: space-between;
 	gap: 8px;
 }
+.shb-card-photo {
+	width: 56px;
+	height: 56px;
+	flex: 0 0 56px;
+	object-fit: cover;
+	border-radius: 12px;
+	background: var(--sh-creme);
+	margin-right: 4px;
+}
 .shb-card-main {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
 	min-width: 0;
+	flex: 1 1 auto;
 }
 .shb-card-name {
 	font-family: var(--sh-font-display);

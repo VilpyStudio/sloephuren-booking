@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.9.0] - 2026-07-13
+
+### Added
+- **Mini-foto per sloep**: bij een sloep-type kun je nu een foto uit de mediabibliotheek kiezen (Sloephuren → Sloep-types → Bewerk → "Foto"). De widget toont die foto als kleine thumbnail in stap 1 ("Kies je sloep"), zodat bezoekers meteen zien om welke sloep het gaat.
+
 ## [2.8.2] - 2026-07-13
 
 ### Fixed

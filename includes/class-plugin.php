@@ -206,10 +206,12 @@ class SHB_Plugin {
 		// Sloep-types.
 		$boats = array();
 		foreach ( SHB_Bookings::get_boat_types( true ) as $b ) {
+			$img_id = isset( $b->image_id ) ? (int) $b->image_id : 0;
 			$boats[] = array(
 				'id'          => (int) $b->id,
 				'name'        => $b->name,
 				'max_persons' => (int) $b->max_persons,
+				'image'       => $img_id ? wp_get_attachment_image_url( $img_id, 'thumbnail' ) : '',
 			);
 		}
 

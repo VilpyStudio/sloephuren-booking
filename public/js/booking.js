@@ -22,7 +22,7 @@
 
 	// Sloepen met sub-tekst.
 	var BOATS = ( D.boats || [] ).map( function ( b ) {
-		return { id: b.id, name: b.name, sub: 'max. ' + b.max_persons + ' personen', max: b.max_persons };
+		return { id: b.id, name: b.name, sub: 'max. ' + b.max_persons + ' personen', max: b.max_persons, image: b.image || '' };
 	} );
 
 	// Pakketten met design-subtekst en korte naam.
@@ -426,7 +426,7 @@
 
 	function renderStep( step ) {
 		if ( step === 1 ) { return renderCards( BOATS.map( function ( b ) {
-			return { sel: state.sloep === b.id, name: b.name, sub: b.sub, onClick: function () { pickBoat( b ); } };
+			return { sel: state.sloep === b.id, name: b.name, sub: b.sub, image: b.image, onClick: function () { pickBoat( b ); } };
 		} ) ); }
 
 		if ( step === 2 ) { return renderCards( PRODUCTS.map( function ( p ) {
@@ -460,6 +460,7 @@
 				onclick: it.disabled ? null : it.onClick
 			}, [
 				el( 'div', { 'class': 'shb-card-row' }, [
+					it.image ? el( 'img', { 'class': 'shb-card-photo', src: it.image, alt: '' } ) : null,
 					el( 'div', { 'class': 'shb-card-main' }, [
 						el( 'div', { 'class': 'shb-card-name', text: it.name } ),
 						it.sub ? el( 'div', { 'class': 'shb-card-sub', text: it.sub } ) : null,

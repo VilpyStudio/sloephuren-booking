@@ -66,10 +66,11 @@ class SHB_Bookings {
 			'name'        => sanitize_text_field( $data['name'] ),
 			'stock'       => max( 0, (int) $data['stock'] ),
 			'max_persons' => max( 1, (int) $data['max_persons'] ),
+			'image_id'    => max( 0, (int) ( $data['image_id'] ?? 0 ) ),
 			'active'      => empty( $data['active'] ) ? 0 : 1,
 			'sort_order'  => (int) ( $data['sort_order'] ?? 0 ),
 		);
-		$formats = array( '%s', '%d', '%d', '%d', '%d' );
+		$formats = array( '%s', '%d', '%d', '%d', '%d', '%d' );
 
 		if ( $id > 0 ) {
 			$wpdb->update( $table, $fields, array( 'id' => $id ), $formats, array( '%d' ) );
