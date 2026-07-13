@@ -3,6 +3,11 @@
 Alle noemenswaardige wijzigingen aan Sloephuren Booking worden hier bijgehouden.
 Format volgt losjes [Keep a Changelog](https://keepachangelog.com/); versies volgen [SemVer](https://semver.org/lang/nl/).
 
+## [2.9.1] - 2026-07-13
+
+### Fixed
+- De knop "Kies afbeelding" bij een sloep-type deed niets: het script controleerde bij het laden van de pagina al op de mediabibliotheek, terwijl die pas later (in de footer) beschikbaar komt, waardoor de knop nooit werd gekoppeld. De controle gebeurt nu op het moment van klikken, zodat de mediabibliotheek netjes opent.
+
 ## [2.9.0] - 2026-07-13
 
 ### Added

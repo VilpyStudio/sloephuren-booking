@@ -1269,9 +1269,13 @@ class SHB_Admin {
 				remove  = document.getElementById( 'shb-image-remove' ),
 				field   = document.getElementById( 'shb-image-id' ),
 				preview = document.getElementById( 'shb-image-preview' );
-			if ( ! choose || ! window.wp || ! window.wp.media ) { return; }
+			if ( ! choose ) { return; }
 			choose.addEventListener( 'click', function( e ) {
 				e.preventDefault();
+				if ( ! window.wp || ! window.wp.media ) {
+					window.alert( 'De mediabibliotheek kon niet worden geladen. Ververs de pagina en probeer opnieuw.' );
+					return;
+				}
 				if ( frame ) { frame.open(); return; }
 				frame = wp.media( {
 					title: <?php echo wp_json_encode( __( 'Kies een foto voor deze sloep', 'sloephuren-booking' ) ); ?>,
